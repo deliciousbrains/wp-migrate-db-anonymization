@@ -25,10 +25,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-if ( ! file_exists( dirname( __FILE__ ) . '/vendor/autoload.php' ) ) {
-	throw new exception( 'WP Migrate DB Anonymization addon not built correctly.' );
-}
-
 // Bootstrap our autoloader
 require_once dirname( __FILE__ ) . '/vendor/autoload.php';
 
@@ -44,4 +40,21 @@ function wpmdb_anonymize() {
 	return call_user_func( array( $class, 'get_instance' ), __FILE__, $version );
 }
 
-wpmdb_anonymize();
+/**
+ * Load the plugin if it is compatible with the site.
+ */
+function wpmdb_anonymize_init() {
+	$plugin_check = new WPMDB_Anonymization_Compatibility( __FILE__ );
+	if ( ! $plugin_check->is_compatible() ) {
+		// Plugin does not meet requirements, display notice and bail
+		$plugin_check->register_notice();
+
+		return;
+	}
+
+	// Start it up
+	wpmdb_anonymize();
+}
+
+// Initialize the plugin
+wpmdb_anonymize_init();
