@@ -3,7 +3,9 @@ WP Migrate DB Anonymization Addon
 
 ## Installation
 
-The addon should be installed on the live site. This ensures any time the site's database is exported (or pushed/pulled), the user data is anonymized.
+The addon should be installed on the live site. This ensures any time the site's database is exported, pushed or pulled, the user data is anonymized.
+
+When the plugin is activated it will anonymize by default. You will need to deactivate the plugin to turn it off.
 
 ## Configuration
 

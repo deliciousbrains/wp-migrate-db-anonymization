@@ -13,6 +13,8 @@ Integrates with WP Migrate DB and WP Migrate DB Pro to anonymize user data on da
 
 Ensure no user personal data is included when a database is exported, pulled or pushed using WP Migrate DB (export) or WP Migrate DB Pro (export, pull, push).
 
+When the plugin is activated it will anonymize by default. You will need to deactivate the plugin to turn it off.
+
 User data is anonymized and includes data from the following tables:
 
 - users
@@ -33,6 +35,6 @@ To replace all passwords with a hashed default password, set the password using 
 
 == Changelog ==
 
-= 0.1 - 2018-05-14 =
+= 0.1 - 2018-05-22 =
 
 * Initial release
