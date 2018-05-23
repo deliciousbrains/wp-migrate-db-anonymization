@@ -7,11 +7,13 @@ Stable tag: 0.1
 Requires PHP: 5.3.3
 License: GPLv3
 
-Integrates with WP Migrate DB and WP Migrate DB Pro to anonymize user data on database export, pull or push.
+Addon for WP Migrate DB and WP Migrate DB Pro to anonymize user data on database export, pull or push.
 
 == Description ==
 
-Ensure no user personal data is included when a database is exported, pulled or pushed using WP Migrate DB (export) or WP Migrate DB Pro (export, pull, push).
+This addon requires [WP Migrate DB Pro](https://deliciousbrains.com/wp-migrate-db-pro) or [WP Migrate DB](https://wordpress.org/plugins/wp-migrate-db/).
+
+Ensure no user personal data is included when a database is exported, pulled or pushed using [WP Migrate DB](https://wordpress.org/plugins/wp-migrate-db/) (export) or [WP Migrate DB Pro](https://deliciousbrains.com/wp-migrate-db-pro) (export, pull, push).
 
 When the plugin is activated it will anonymize by default. You will need to deactivate the plugin to turn it off.
 
