@@ -32,3 +32,5 @@ The rules for anonymization can be extended using the `wpmdb_anonymization_confi
 
         return $config;
     }
+    
+    add_filter( 'wpmdb_anonymization_config', 'my_wpmdb_anonymization_rules' );
