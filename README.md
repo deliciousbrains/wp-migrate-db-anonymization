@@ -13,6 +13,11 @@ To preserve specific rows in the users table, use the `WPMDB_ANONYMIZATION_USER_
 
 To replace all passwords with a hashed default password, set the password using the `WPMDB_ANONYMIZATION_DEFAULT_PASSWORD` constant.
 
+These constants should be defined in the site's wp-config.php file, for example:
+
+    define( 'WPMDB_ANONYMIZATION_USER_LOGIN_WHITELIST', 'your.admin.email@gmail.com' );
+    define( 'WPMDB_ANONYMIZATION_DEFAULT_PASSWORD', 'password123' );
+    
 ## Extending
 
 The rules for anonymization can be extended using the `wpmdb_anonymization_config` filter:
