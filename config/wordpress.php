@@ -49,16 +49,16 @@ return array(
 	),
 	'comments' => array(
 		'comment_author'       => array(
-			'fake_data_type'     => 'userName',
+			'fake_data_type' => 'userName',
 		),
 		'comment_author_email' => array(
-			'fake_data_type'     => 'email',
+			'fake_data_type' => 'email',
 		),
 		'comment_author_url'   => array(
-			'fake_data_type'     => 'url',
+			'fake_data_type' => 'url',
 		),
 		'comment_author_IP'    => array(
-			'fake_data_type'     => 'ipv4',
+			'fake_data_type' => 'ipv4',
 		),
 	),
 );
