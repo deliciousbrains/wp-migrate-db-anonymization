@@ -2,8 +2,8 @@
 Contributors: deliciousbrains
 Tags: gdpr, anonymization, anonymize, anonymizer, anonymise, migrate, migration, export, data dump, backup, database, mysql
 Requires at least: 3.6
-Tested up to: 4.9.5
-Stable tag: 0.1
+Tested up to: 4.9.6
+Stable tag: 0.2
 Requires PHP: 5.3.3
 License: GPLv3
 
@@ -21,6 +21,7 @@ User data is anonymized and includes data from the following tables:
 
 - users
 - usermeta
+- comments
 
 Supported plugins:
 
@@ -37,6 +38,14 @@ To replace all passwords with a hashed default password, set the password using 
 
 == Changelog ==
 
+= 0.2 - 2018-06-22 =
+
+* New: Filter for whitelisting users to stop anonymization - `wpmdb_anonymization_user_whitelisted`
+* Bug Fix: - Comments not anonymized
+* Bug Fix: - Order data in post meta not anonymized
+* Bug Fix: - Customer IP and PayPal data not anonymized
+
+* Initial release
 = 0.1 - 2018-05-22 =
 
 * Initial release
