@@ -18,7 +18,7 @@ These constants should be defined in the site's wp-config.php file, for example:
     define( 'WPMDB_ANONYMIZATION_USER_LOGIN_WHITELIST', 'your.admin.email@gmail.com' );
     define( 'WPMDB_ANONYMIZATION_DEFAULT_PASSWORD', 'password123' );
     
-You can also programmatically control which users are whitelisted with the following filter:
+You can also programmatically control which users are whitelisted with the following filter, added to a plugin or mu-plugin file:
 
     function my_wpmdb_anonymization_user_whitelisted( $whitelisted, $user_login )  {
         if ( false !== strpos( $user_login, '@somedomain.com' ) ) {
