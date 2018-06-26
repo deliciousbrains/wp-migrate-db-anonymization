@@ -21,7 +21,7 @@ These constants should be defined in the site's wp-config.php file, for example:
 You can also programtically control which users are whitelisted with the following filter:
 
     function my_wpmdb_anonymization_user_whitelisted( $whitelisted, $user_login )  {
-        if ( false !== strpos( $user_login, '@somedomain.com ) ) {
+        if ( false !== strpos( $user_login, '@somedomain.com' ) ) {
             // All users with the login containing an email address of somedomain.com are whitelisted
             return true;
         }
