@@ -3,6 +3,9 @@ WP Migrate DB Anonymization Addon
 
 ## Installation
 
+If you clone from this repository you will need to run `composer install` to complete the install of the plugin. The `vendor` directory is packaged with the plugin on the WordPress plugin repository:
+https://wordpress.org/plugins/wp-migrate-db-anonymization/#developers 
+
 The addon should be installed on the live site. This ensures any time the site's database is exported, pushed or pulled, the user data is anonymized.
 
 When the plugin is activated it will anonymize by default. You will need to deactivate the plugin to turn it off.
