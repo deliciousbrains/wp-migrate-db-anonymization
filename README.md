@@ -32,7 +32,7 @@ You can also programmatically control which users are whitelisted with the follo
     
 ## Extending
 
-The rules for anonymization can be extended using the `wpmdb_anonymization_config` filter:
+The rules for anonymization can be extended using the `wpmdb_anonymization_config` filter, added to a plugin or mu-plugin file:
 
     /**
      * Anonymizes a users date of birth.
