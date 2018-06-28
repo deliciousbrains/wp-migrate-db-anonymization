@@ -45,7 +45,6 @@ To replace all passwords with a hashed default password, set the password using 
 * Bug Fix: - Order data in post meta not anonymized
 * Bug Fix: - Customer IP and PayPal data not anonymized
 
-* Initial release
 = 0.1 - 2018-05-22 =
 
 * Initial release
