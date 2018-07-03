@@ -31,6 +31,8 @@ To preserve specific rows in the users table, use the `WPMDB_ANONYMIZATION_USER_
 
 To replace all passwords with a hashed default password, set the password using the `WPMDB_ANONYMIZATION_DEFAULT_PASSWORD` constant.
 
+The configuration rules can be extended with a filter. [Learn how](https://github.com/deliciousbrains/wp-migrate-db-anonymization#extending).
+
 == Installation ==
 
 1. Use WordPress' built-in installer

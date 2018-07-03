@@ -21,6 +21,11 @@ class Rule {
 	protected $fake_data_type;
 
 	/**
+	 * @var array
+	 */
+	protected $fake_data_args;
+
+	/**
 	 * @var
 	 */
 	protected $post_process_function;
@@ -123,7 +128,13 @@ class Rule {
 			return '';
 		}
 
-		$data = $faker->{$this->fake_data_type};
+		$args = array();
+		if ( isset( $this->fake_data_args ) && is_array( $this->fake_data_args ) ) {
+			$args = $this->fake_data_args;
+		}
+
+		$data = call_user_func_array( array( $faker, $this->fake_data_type ), $args );
+
 		if ( ! empty( $this->post_process_function ) && is_callable( $this->post_process_function ) ) {
 			$data = call_user_func( $this->post_process_function, $data );
 		}

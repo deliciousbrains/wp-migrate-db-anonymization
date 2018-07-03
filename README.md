@@ -54,3 +54,24 @@ The rules for anonymization can be extended using the `wpmdb_anonymization_confi
     }
     
     add_filter( 'wpmdb_anonymization_config', 'my_wpmdb_anonymization_rules' );
+
+If you need to pass arguments to the Faker data method then you can define this using the `fake_data_args` key:
+
+    /**
+     * Anonymizes a users date of birth.
+     *
+     * @param array $config
+     *
+     * @return array
+     */
+    function my_wpmdb_anonymization_rules( $config ) {
+        $config['usermeta']['meta_value'][] = array(
+            'constraint'     => array( 'meta_key' => 'dob' ),
+            'fake_data_type' => 'date',
+            'fake_data_args' => array( 'Y-m-d' ),
+        );
+
+        return $config;
+    }
+    
+    add_filter( 'wpmdb_anonymization_config', 'my_wpmdb_anonymization_rules' );
