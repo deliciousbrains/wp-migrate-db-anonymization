@@ -58,19 +58,23 @@ class Plugin {
 
 		( new Admin( $this->file_path ) )->register();
 
-		add_action( 'plugins_loaded', array( $this, 'bootstrap' ), 11 );
+		add_action( 'plugins_loaded', array( $this, 'bootstrap' ), 21 );
 	}
 
 	/**
 	 * Bootstrap the functionality of the plugin on plugins_loaded so WPMDB already loaded.
 	 */
 	public function bootstrap() {
-		if ( ! class_exists( 'WPMDB_Base' ) ) {
+		if ( ! class_exists( 'WPMDB_Base' ) && ! class_exists( 'WPMDB_Command' ) ) {
 			return;
 		}
 
 		global $wpdb;
-		$wpmdb = isset( $GLOBALS['wpmdbpro'] ) ? $GLOBALS['wpmdbpro'] : $GLOBALS['wpmdb'];
+		$wpmdb = $this->get_wpmdb_instance();
+
+		if ( ! $wpmdb ) {
+			return;
+		}
 
 		$loader = new Loader( $this->file_path );
 		$config = $loader->init( new Config( $wpdb, $wpmdb ) );
@@ -79,6 +83,27 @@ class Plugin {
 
 		$migration = new Migration( $config, $faker );
 		$migration->register();
+	}
+
+	/**
+	 * Get the global mdb instance
+	 *
+	 * @return bool|mixed|\WPMDB
+	 */
+	protected function get_wpmdb_instance() {
+		if ( isset( $GLOBALS['wpmdbpro'] ) ) {
+			return $GLOBALS['wpmdbpro'];
+		}
+
+		if ( isset( $GLOBALS['wpmdb'] ) ) {
+			return $GLOBALS['wpmdb'];
+		}
+
+		if ( function_exists( 'wp_migrate_db' ) ) {
+			return wp_migrate_db();
+		}
+
+		return false;
 	}
 
 	/**
