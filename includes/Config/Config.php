@@ -27,10 +27,10 @@ class Config {
 	/**
 	 * Config constructor.
 	 *
-	 * @param \wpdb       $wpdb
-	 * @param \WPMDB_Base $wpmdb
+	 * @param \wpdb $wpdb
+	 * @param       $wpmdb
 	 */
-	public function __construct( \wpdb $wpdb, \WPMDB_Base $wpmdb ) {
+	public function __construct( \wpdb $wpdb, $wpmdb ) {
 		$this->wpdb  = $wpdb;
 		$this->wpmdb = $wpmdb;
 	}
@@ -41,7 +41,7 @@ class Config {
 	}
 
 	public function clean_table( $table ) {
-		return str_replace( array( $this->wpmdb->get( 'temp_prefix' ), $this->wpdb->base_prefix ), '', $table );
+		return str_replace( array( '_mig_', $this->wpdb->base_prefix ), '', $table );
 	}
 
 	public function has_table( $table ) {

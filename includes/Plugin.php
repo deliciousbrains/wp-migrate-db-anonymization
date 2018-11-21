@@ -65,7 +65,7 @@ class Plugin {
 	 * Bootstrap the functionality of the plugin on plugins_loaded so WPMDB already loaded.
 	 */
 	public function bootstrap() {
-		if ( ! class_exists( 'WPMDB_Base' ) && ! class_exists( 'WPMDB_Command' ) ) {
+		if ( ! class_exists( 'WPMDB_PHP_Checker') && ! class_exists( 'WPMDB_Base' ) && ! class_exists( 'WPMDB_Command' ) ) {
 			return;
 		}
 

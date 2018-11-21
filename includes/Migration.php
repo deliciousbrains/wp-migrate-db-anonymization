@@ -36,18 +36,18 @@ class Migration {
 	}
 
 	/**
-	 * @param array          $data
-	 * @param bool           $before_fired
-	 * @param \WPMDB_Replace $wpmdb_replace
+	 * @param array $data
+	 * @param bool  $before_fired
+	 * @param       $wpmdb_replace
 	 *
 	 * @return array
 	 */
-	public function hook_wpmdb_after_replace_custom_data( $data, $before_fired, \WPMDB_Replace $wpmdb_replace ) {
+	public function hook_wpmdb_after_replace_custom_data( $data, $before_fired, $wpmdb_replace ) {
 		if ( ! $this->is_allowed_migration_type( $wpmdb_replace->get_intent() ) ) {
 			return $data;
 		}
 
-	    $table = $this->config->clean_table( $wpmdb_replace->get_table() );
+		$table = $this->config->clean_table( $wpmdb_replace->get_table() );
 
 		if ( ! $this->config->has_table( $table ) ) {
 			return $data;
