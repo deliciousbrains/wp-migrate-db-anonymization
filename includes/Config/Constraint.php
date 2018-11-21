@@ -22,7 +22,7 @@ class Constraint {
 	protected static function is_whitelisted_user( $user ) {
 		$whitelisted = false;
 		if ( defined( 'WPMDB_ANONYMIZATION_USER_LOGIN_WHITELIST' ) ) {
-			$whitelisted_user_logins = explode( ',', WPMDB_ANONYMIZATION_USER_LOGIN_WHITELIST );
+			$whitelisted_user_logins = array_map( 'trim', explode( ',', WPMDB_ANONYMIZATION_USER_LOGIN_WHITELIST ) );
 
 			$whitelisted = in_array( $user->user_login, $whitelisted_user_logins );
 		}
