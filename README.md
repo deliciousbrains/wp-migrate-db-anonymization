@@ -30,7 +30,7 @@ You can also programmatically control which users are whitelisted with the follo
      * @return bool
      */
     function my_wpmdb_anonymization_user_whitelisted( $whitelisted, $user )  {
-        if ( false !== strpos( $user->user_email, '@somedomain.com' ) ) {
+        if ( false !== strrpos( $user->user_email, '@somedomain.com' ) ) {
             // All users with the login containing an email address of somedomain.com are whitelisted
             return true;
         }
