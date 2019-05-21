@@ -47,6 +47,10 @@ class Migration {
 			return $data;
 		}
 
+		if ( empty( $data ) ) {
+			return $data;
+		}
+
 		$table = $this->config->clean_table( $wpmdb_replace->get_table() );
 
 		if ( ! $this->config->has_table( $table ) ) {
