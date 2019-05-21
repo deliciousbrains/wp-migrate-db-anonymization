@@ -4,7 +4,7 @@ Plugin Name: WP Migrate DB Anonymization
 Plugin URI: https://deliciousbrains.com/wp-migrate-db-pro/
 Description: An extension to WP Migrate DB and WP Migrate DB Pro that anonymizes user data.
 Author: Delicious Brains
-Version: 0.3.3
+Version: 0.3.4
 Author URI: https://deliciousbrains.com
 Network: True
 */
@@ -35,7 +35,7 @@ require_once dirname( __FILE__ ) . '/vendor/autoload.php';
 function wpmdb_anonymize() {
 	// Namespaced class name as variable so it can be parsed in < PHP 5.3
 	$class   = 'WPMDB\\Anonymization\\Plugin';
-	$version = '0.3.3';
+	$version = '0.3.4';
 
 	return call_user_func( array( $class, 'get_instance' ), __FILE__, $version );
 }

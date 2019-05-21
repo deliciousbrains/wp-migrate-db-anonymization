@@ -2,8 +2,8 @@
 Contributors: deliciousbrains
 Tags: gdpr, anonymization, anonymize, anonymizer, anonymise, migrate, migration, export, data dump, backup, database, mysql
 Requires at least: 3.6
-Tested up to: 4.9.8
-Stable tag: 0.3.3
+Tested up to: 5.2
+Stable tag: 0.3.4
 Requires PHP: 5.3.3
 License: GPLv3
 
@@ -39,6 +39,10 @@ The configuration rules can be extended with a filter. [Learn how](https://githu
 2. Activate plugin
 
 == Changelog ==
+
+= 0.3.4 - 2019-05-21 =
+
+* Improvement: Don't replace empty data with fake data
 
 = 0.3.3 - 2018-11-21 =
 
