@@ -79,7 +79,7 @@ class Plugin {
 		$loader = new Loader( $this->file_path );
 		$config = $loader->init( new Config( $wpdb, $wpmdb ) );
 
-		$faker = Factory::create();
+		$faker = Factory::create( get_locale() );
 
 		$migration = new Migration( $config, $faker );
 		$migration->register();
