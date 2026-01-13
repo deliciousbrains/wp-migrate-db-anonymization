@@ -2,7 +2,7 @@
 
 namespace WPMDB\Anonymization;
 
-use Faker\Factory;
+use DummyGenerator\DummyGeneratorFactory;
 use WPMDB\Anonymization\Config\Config;
 use WPMDB\Anonymization\Config\Loader;
 
@@ -54,7 +54,6 @@ class Plugin {
 		$this->slug      = basename( dirname( $plugin_file_path ) );
 
 		$GLOBALS['wpmdb_meta'][ $this->slug ]['version'] = $plugin_version;
-		load_plugin_textdomain( $this->slug, false, dirname( plugin_basename( $this->file_path ) ) . '/languages/' );
 
 		( new Admin( $this->file_path ) )->register();
 
@@ -79,7 +78,7 @@ class Plugin {
 		$loader = new Loader( $this->file_path );
 		$config = $loader->init( new Config( $wpdb, $wpmdb ) );
 
-		$faker = Factory::create();
+		$faker = DummyGeneratorFactory::create();
 
 		$migration = new Migration( $config, $faker );
 		$migration->register();

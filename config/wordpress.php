@@ -15,7 +15,7 @@ return array(
 			'constraint'     => 'WPMDB\\Anonymization\\Config\\Constraint::is_not_whitelisted_user',
 		),
 		'user_email'    => array(
-			'fake_data_type' => 'email',
+			'fake_data_type' => 'safeEmail',
 			'constraint'     => 'WPMDB\\Anonymization\\Config\\Constraint::is_not_whitelisted_user',
 		),
 		'user_url'      => array(
@@ -52,13 +52,16 @@ return array(
 			'fake_data_type' => 'userName',
 		),
 		'comment_author_email' => array(
-			'fake_data_type' => 'email',
+			'fake_data_type' => 'safeEmail',
 		),
 		'comment_author_url'   => array(
 			'fake_data_type' => 'url',
 		),
 		'comment_author_IP'    => array(
 			'fake_data_type' => 'ipv4',
+		),
+		'comment_agent'        => array(
+			'fake_data_type' => 'userAgent',
 		),
 	),
 );

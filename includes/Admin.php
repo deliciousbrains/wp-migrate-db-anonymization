@@ -32,8 +32,8 @@ class Admin {
 		<div class="updated warning error">
 			<p>
 				<?php
-				$deactivate_link = sprintf( '<a style="text-decoration:none;" href="%s">%s</a>', $deactivate_url, __( 'deactivate' ) );
-				printf( __( '<strong>Anonymization Addon</strong> &mdash; All pushes to this site are currently disabled because you have the Anonymization addon enabled. We also advise caution when pulling databases into this site to ensure no anonymized data gets migrated. You can %s the addon to remove this restriction.' ), $deactivate_link ); ?>
+				$deactivate_link = sprintf( '<a style="text-decoration:none;" href="%s">%s</a>', $deactivate_url, __( 'deactivate', 'wp-migrate-db-anonymization' ) );
+				printf( __( '<strong>Anonymization Addon</strong> &mdash; All pushes to this site are currently disabled because you have the Anonymization addon enabled. We also advise caution when pulling databases into this site to ensure no anonymized data gets migrated. You can %s the addon to remove this restriction.', 'wp-migrate-db-anonymization' ), $deactivate_link ); ?>
 			</p>
 		</div>
 		<?php

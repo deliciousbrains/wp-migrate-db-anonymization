@@ -40,7 +40,7 @@ return array(
 			),
 			array(
 				'constraint'     => array( 'meta_key' => 'billing_email' ),
-				'fake_data_type' => 'email',
+				'fake_data_type' => 'safeEmail',
 			),
 			array(
 				'constraint'     => array( 'meta_key' => 'billing_phone' ),
@@ -92,7 +92,7 @@ return array(
 			),
 			array(
 				'constraint'     => array( 'meta_key' => 'Payer PayPal address' ),
-				'fake_data_type' => 'email',
+				'fake_data_type' => 'safeEmail',
 			),
 			array(
 				'constraint'     => array( 'meta_key' => 'Payer first name' ),
@@ -144,7 +144,7 @@ return array(
 			),
 			array(
 				'constraint'     => array( 'meta_key' => '_billing_email' ),
-				'fake_data_type' => 'email',
+				'fake_data_type' => 'safeEmail',
 			),
 			array(
 				'constraint'     => array( 'meta_key' => '_billing_phone' ),
@@ -196,7 +196,7 @@ return array(
 			),
 			array(
 				'constraint'     => array( 'meta_key' => 'Payer PayPal address' ),
-				'fake_data_type' => 'email',
+				'fake_data_type' => 'safeEmail',
 			),
 			array(
 				'constraint'     => array( 'meta_key' => 'Payer first name' ),

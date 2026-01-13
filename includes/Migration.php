@@ -2,7 +2,7 @@
 
 namespace WPMDB\Anonymization;
 
-use Faker\Generator;
+use DummyGenerator\DummyGenerator;
 use WPMDB\Anonymization\Config\Config;
 
 class Migration {
@@ -13,7 +13,7 @@ class Migration {
 	protected $config;
 
 	/**
-	 * @var Generator
+	 * @var DummyGenerator
 	 */
 	protected $faker;
 
@@ -21,9 +21,9 @@ class Migration {
 	 * Migration constructor.
 	 *
 	 * @param Config    $config
-	 * @param Generator $faker
+	 * @param DummyGenerator $faker
 	 */
-	public function __construct( Config $config, Generator $faker ) {
+	public function __construct( Config $config, DummyGenerator $faker ) {
 		$this->config = $config;
 		$this->faker  = $faker;
 	}

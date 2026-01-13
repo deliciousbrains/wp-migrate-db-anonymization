@@ -4,39 +4,41 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "4bbb7b557b5aef5ed5ee14fd9de3877c",
+    "content-hash": "0aa8d172b96032c125b0ef007691e861",
     "packages": [
         {
-            "name": "fzaninotto/faker",
-            "version": "v1.7.1",
+            "name": "johnykvsky/dummygenerator",
+            "version": "v0.1.0",
             "source": {
                 "type": "git",
-                "url": "https://github.com/fzaninotto/Faker.git",
-                "reference": "d3ed4cc37051c1ca52d22d76b437d14809fc7e0d"
+                "url": "https://github.com/johnykvsky/dummygenerator.git",
+                "reference": "4286d41f2ba457e5ca970ac6721c26c637c16f06"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/fzaninotto/Faker/zipball/d3ed4cc37051c1ca52d22d76b437d14809fc7e0d",
-                "reference": "d3ed4cc37051c1ca52d22d76b437d14809fc7e0d",
+                "url": "https://api.github.com/repos/johnykvsky/dummygenerator/zipball/4286d41f2ba457e5ca970ac6721c26c637c16f06",
+                "reference": "4286d41f2ba457e5ca970ac6721c26c637c16f06",
                 "shasum": ""
             },
             "require": {
-                "php": "^5.3.3 || ^7.0"
+                "php": "^8.3",
+                "psr/clock": "^1.0"
             },
             "require-dev": {
-                "ext-intl": "*",
-                "phpunit/phpunit": "^4.0 || ^5.0",
-                "squizlabs/php_codesniffer": "^1.5"
+                "phpstan/extension-installer": "^1.4.3",
+                "phpstan/phpstan": "^2.1.18",
+                "phpunit/phpunit": "^12.2.0",
+                "slevomat/coding-standard": "^8.19.1",
+                "squizlabs/php_codesniffer": "^3.13.2 || ^4.0.0"
+            },
+            "suggest": {
+                "ext-intl": "Required for better transliteration i.e. in Internet Extension",
+                "ext-mbstring": "Required for multibyte Unicode string functionality."
             },
             "type": "library",
-            "extra": {
-                "branch-alias": {
-                    "dev-master": "1.8-dev"
-                }
-            },
             "autoload": {
                 "psr-4": {
-                    "Faker\\": "src/Faker/"
+                    "DummyGenerator\\": "src/"
                 }
             },
             "notification-url": "https://packagist.org/downloads/",
@@ -45,24 +47,79 @@
             ],
             "authors": [
                 {
-                    "name": "François Zaninotto"
+                    "name": "Johny Kvsky",
+                    "homepage": "https://github.com/johnykvsky"
                 }
             ],
-            "description": "Faker is a PHP library that generates fake data for you.",
+            "description": "Dummy / fake data generator for modern PHP",
             "keywords": [
-                "data",
+                "Dummy",
+                "Fake data",
                 "faker",
-                "fixtures"
+                "generator"
             ],
-            "time": "2017-08-15T16:48:10+00:00"
+            "support": {
+                "issues": "https://github.com/johnykvsky/dummygenerator/issues",
+                "source": "https://github.com/johnykvsky/dummygenerator/tree/v0.1.0"
+            },
+            "time": "2025-09-26T14:19:15+00:00"
+        },
+        {
+            "name": "psr/clock",
+            "version": "1.0.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/php-fig/clock.git",
+                "reference": "e41a24703d4560fd0acb709162f73b8adfc3aa0d"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/php-fig/clock/zipball/e41a24703d4560fd0acb709162f73b8adfc3aa0d",
+                "reference": "e41a24703d4560fd0acb709162f73b8adfc3aa0d",
+                "shasum": ""
+            },
+            "require": {
+                "php": "^7.0 || ^8.0"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Psr\\Clock\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "PHP-FIG",
+                    "homepage": "https://www.php-fig.org/"
+                }
+            ],
+            "description": "Common interface for reading the clock.",
+            "homepage": "https://github.com/php-fig/clock",
+            "keywords": [
+                "clock",
+                "now",
+                "psr",
+                "psr-20",
+                "time"
+            ],
+            "support": {
+                "issues": "https://github.com/php-fig/clock/issues",
+                "source": "https://github.com/php-fig/clock/tree/1.0.0"
+            },
+            "time": "2022-11-25T14:36:26+00:00"
         }
     ],
     "packages-dev": [],
     "aliases": [],
     "minimum-stability": "stable",
-    "stability-flags": [],
+    "stability-flags": {},
     "prefer-stable": false,
     "prefer-lowest": false,
-    "platform": [],
-    "platform-dev": []
+    "platform": {},
+    "platform-dev": {},
+    "plugin-api-version": "2.6.0"
 }

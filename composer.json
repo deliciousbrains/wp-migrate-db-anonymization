@@ -1,23 +1,21 @@
 {
-    "name": "deliciousbrains/wp-migrate-db-anonymization",
-    "description": "An extension to WP Migrate DB Pro that anonymizes user data",
-    "type": "wordpress-plugin",
-    "require": {
-        "fzaninotto/faker": "^1.7"
-    },
-    "license": "GPLv3",
-    "authors": [
-        {
-            "name": "Iain",
-            "email": "iain@polevaultweb.com"
-        }
-    ],
-    "autoload": {
-      "psr-4": {
-        "WPMDB\\Anonymization\\": "includes"
-      },
-      "files": [
-        "includes/Compatibility.php"
-      ]
+  "name": "deliciousbrains/wp-migrate-db-anonymization",
+  "description": "An extension to WP Migrate DB Pro that anonymizes user data",
+  "type": "wordpress-plugin",
+  "license": "GPLv3",
+  "authors": [
+    {
+      "name": "Iain",
+      "email": "iain@polevaultweb.com"
     }
+  ],
+  "autoload": {
+    "psr-4": {
+      "WPMDB\\Anonymization\\": "includes"
+    }
+  },
+  "require": {
+    "php": "^8.3",
+    "johnykvsky/dummygenerator": "^0.1.0"
+  }
 }
