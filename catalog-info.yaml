@@ -1,0 +1,36 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: wp-migrate-db-pro-anonymization
+  title: WP Migrate Anonymization plugin
+  description: An addon for WP Migrate DB Pro that anonymizes user data
+  tags:
+    - wordpress
+    - plugin
+    - php
+    - migrate
+    - database
+  links:
+    - url: https://wpengine.slack.com/archives/C04TK472NQN
+      title: '#team-delicious'
+      icon: chat
+    - url: https://deliciousbrains.com/wp-migrate-db-pro/
+      title: Product Website
+      icon: website
+    - url: https://wordpress.org/plugins/wp-migrate-db-anonymization/
+      title: Plugin on wordpress.org
+      icon: website
+    - url: https://github.com/deliciousbrains/wp-migrate-db-pro-/anonymization/
+      title: GitHub Repo
+      icon: github
+    - url: https://wpengine.atlassian.net/browse/DELI
+      title: JIRA DELI
+      icon: jira
+  annotations:
+    github.com/project-slug: deliciousbrains/wp-migrate-db-pro-anonymization
+    backstage.io/techdocs-ref: dir:.
+    jira/project-key: DELI
+spec:
+  type: plugin
+  lifecycle: production
+  owner: delicious
