@@ -28,7 +28,6 @@ metadata:
       icon: jira
   annotations:
     github.com/project-slug: deliciousbrains/wp-migrate-db-pro-anonymization
-    backstage.io/techdocs-ref: dir:.
     jira/project-key: DELI
 spec:
   type: plugin
