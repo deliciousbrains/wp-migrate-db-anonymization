@@ -3,6 +3,7 @@
 namespace WPMDB\Anonymization\Tests\Unit\Config;
 
 use WPMDB\Anonymization\Config\Replacement;
+use WPMDB\Anonymization\Config\Rule;
 use WPMDB\Anonymization\Tests\TestCase;
 
 class ReplacementTest extends TestCase {
@@ -33,5 +34,26 @@ class ReplacementTest extends TestCase {
 		define( 'WPMDB_ANONYMIZATION_DEFAULT_PASSWORD', '' );
 
 		$this->assertSame( 'hashed:fake-password', Replacement::password( 'fake-password' ) );
+	}
+
+	public function test_serialized_list_wraps_value_in_serialized_array() {
+		$this->assertSame( 'a:1:{i:0;s:16:"fake@example.com";}', Replacement::serialized_list( 'fake@example.com' ) );
+	}
+
+	public function test_coupon_email_restrictions_are_a_serialized_list_of_one_fake_email() {
+		$rule = new Rule( 'postmeta', 'meta_value' );
+		$rule->load(
+			array(
+				'constraint'            => array( 'meta_key' => 'customer_email' ),
+				'fake_data_type'        => 'email',
+				'post_process_function' => 'WPMDB\\Anonymization\\Config\\Replacement::serialized_list',
+			)
+		);
+
+		$emails = unserialize( $rule->anonymize( $this->make_faker() ) );
+
+		$this->assertIsArray( $emails );
+		$this->assertCount( 1, $emails );
+		$this->assertNotFalse( filter_var( $emails[0], FILTER_VALIDATE_EMAIL ) );
 	}
 }

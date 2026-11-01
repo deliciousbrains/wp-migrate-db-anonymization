@@ -7,6 +7,15 @@
  * data and IDs are left untouched.
  */
 
+// VAT numbers identify sole traders as well as companies. The keys come from
+// the WooCommerce EU VAT Number extension, YITH WooCommerce EU VAT and similar
+// plugins, which use the same keys for customer and order meta.
+$vat_number_rule = array(
+	'constraint'     => array( 'meta_key' => array( 'in' => array( 'billing_vat_number', '_billing_vat_number', 'vat_number', 'billing_yweu_vat', '_billing_yweu_vat', 'yweu_vat_number', 'yweu_billing_vat' ) ) ),
+	'fake_data_type' => 'regexify',
+	'fake_data_args' => array( '[A-Z]{2}[0-9]{9}' ),
+);
+
 // Order address and customer meta, stored in postmeta (legacy order storage)
 // or wc_orders_meta (HPOS) depending on the store's order storage setting.
 $order_meta_rules = array(
@@ -31,7 +40,8 @@ $order_meta_rules = array(
 		'fake_data_type' => 'secondaryAddress',
 	),
 	array(
-		'constraint'     => array( 'meta_key' => array( 'in' => array( '_billing_city', '_shipping_city' ) ) ),
+		// ywev_* keys are YITH WooCommerce EU VAT's evidence of the customer's location.
+		'constraint'     => array( 'meta_key' => array( 'in' => array( '_billing_city', '_shipping_city', 'ywev_CITY' ) ) ),
 		'fake_data_type' => 'city',
 	),
 	array(
@@ -39,7 +49,7 @@ $order_meta_rules = array(
 		'fake_data_type' => 'postcode',
 	),
 	array(
-		'constraint'     => array( 'meta_key' => array( 'in' => array( '_billing_state', '_shipping_state' ) ) ),
+		'constraint'     => array( 'meta_key' => array( 'in' => array( '_billing_state', '_shipping_state', 'ywev_STATE' ) ) ),
 		'fake_data_type' => 'state',
 	),
 	array(
@@ -60,17 +70,20 @@ $order_meta_rules = array(
 		'fake_data_type' => 'address',
 	),
 	array(
-		'constraint'     => array( 'meta_key' => '_customer_ip_address' ),
+		'constraint'     => array( 'meta_key' => array( 'in' => array( '_customer_ip_address', 'ywev_IP_ADDRESS' ) ) ),
 		'fake_data_type' => 'ipv4',
 	),
 	array(
-		'constraint'     => array( 'meta_key' => '_customer_user_agent' ),
+		// Order attribution (WooCommerce 8.5+) also records the customer's user agent.
+		'constraint'     => array( 'meta_key' => array( 'in' => array( '_customer_user_agent', '_wc_order_attribution_user_agent' ) ) ),
 		'fake_data_type' => 'userAgent',
 	),
 	array(
-		'constraint'     => array( 'meta_key' => '_stripe_customer_id' ),
+		// Stripe and PayPal Express customer, card and payer IDs.
+		'constraint'     => array( 'meta_key' => array( 'in' => array( '_stripe_customer_id', '_stripe_card_id', '_wc_paypal_express_customer_id', '_wc_paypal_express_payer_id' ) ) ),
 		'fake_data_type' => 'ean13',
 	),
+	$vat_number_rule,
 );
 
 // HPOS order addresses, one row each for the billing and shipping address.
@@ -146,6 +159,17 @@ return array(
 				'fake_data_type' => 'ipv4',
 			),
 			array(
+				// Order attribution data is also saved to the customer when they register.
+				'constraint'     => array( 'meta_key' => '_wc_order_attribution_user_agent' ),
+				'fake_data_type' => 'userAgent',
+			),
+			array(
+				// PayPal Express customer ID and billing agreement.
+				'constraint'     => array( 'meta_key' => array( 'in' => array( 'wc_paypal_express_customer_id', '_paypal_billing_agreement' ) ) ),
+				'fake_data_type' => 'ean13',
+			),
+			$vat_number_rule,
+			array(
 				// Stripe stores this as a user option, e.g. `wp__stripe_customer_id`.
 				'constraint'     => array( 'meta_key' => array( 'regex' => '/_stripe_customer_id$/' ) ),
 				'fake_data_type' => 'ean13',
@@ -158,7 +182,19 @@ return array(
 		),
 	),
 	'postmeta'                                     => array(
-		'meta_value' => $order_meta_rules,
+		'meta_value' => array_merge(
+			$order_meta_rules,
+			array(
+				array(
+					// Coupon email restrictions, a serialized array of customer email
+					// addresses. Replaced with a single fake address so the coupon stays
+					// restricted.
+					'constraint'            => array( 'meta_key' => 'customer_email' ),
+					'fake_data_type'        => 'email',
+					'post_process_function' => 'WPMDB\\Anonymization\\Config\\Replacement::serialized_list',
+				),
+			)
+		),
 	),
 	'wc_orders'                                    => array(
 		'billing_email' => array( 'fake_data_type' => 'email' ),
@@ -201,6 +237,11 @@ return array(
 				'fake_data_type' => 'numerify',
 				'fake_data_args' => array( '203#' ),
 			),
+			array(
+				// PayPal tokens store the payer's PayPal email address.
+				'constraint'     => array( 'meta_key' => 'email' ),
+				'fake_data_type' => 'email',
+			),
 		),
 	),
 	'woocommerce_downloadable_product_permissions' => array(
@@ -211,6 +252,15 @@ return array(
 	),
 	'woocommerce_sessions'                         => array(
 		'session_value' => $empty_serialized_array,
+	),
+	'wc_stock_notifications'                       => array(
+		// Back in stock notification sign-ups.
+		'user_email' => array( 'fake_data_type' => 'email' ),
+	),
+	'wc_email_unsubscribes'                        => array(
+		// Unsalted SHA-256 of the email address, which can be matched by hashing a
+		// known address. Replaced with a random hash of the same length.
+		'email_hash' => array( 'fake_data_type' => 'sha256' ),
 	),
 	'comments'                                     => array(
 		// Order notes can contain customer details, e.g. email addresses.

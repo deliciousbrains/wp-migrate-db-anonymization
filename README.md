@@ -54,15 +54,18 @@ The anonymization rules live in the `config` directory, one file per plugin. Ord
     - `usermeta`: first name, last name, nickname, description, `session_tokens` and `community-events-location` (both store IP addresses), `_new_email` (pending email change) and `signup_ip` (registration IP written by membership and registration plugins)
     - `comments`: author, email, URL, IP address and user agent
 - `woocommerce.php`, including WooCommerce Subscriptions, which stores subscriptions as orders
-    - `usermeta`: customer billing and shipping details, Stripe and WooPayments customer IDs
-    - `postmeta` and `wc_orders_meta`: order billing and shipping details, address search index, customer IP address and user agent, Stripe customer ID, PayPal Standard payer details
+    - `usermeta`: customer billing and shipping details, VAT number, order attribution user agent, Stripe, WooPayments and PayPal Express customer IDs and PayPal billing agreement
+    - `postmeta` and `wc_orders_meta`: order billing and shipping details, address search index, customer IP address and user agent (including order attribution), VAT number and VAT location evidence (YITH WooCommerce EU VAT), Stripe customer and card IDs, PayPal Express customer and payer IDs, PayPal Standard payer details
+    - `postmeta`: coupon email restrictions, replaced with a single fake address so the coupon stays restricted
     - `wc_orders`: billing email, IP address, user agent and customer note
     - `wc_order_addresses`: name, company, address, email and phone
     - `wc_customer_lookup`: username, name, email, location and phone numbers
-    - `woocommerce_payment_tokens` and `woocommerce_payment_tokenmeta`: gateway token, card last 4 digits and expiry
+    - `woocommerce_payment_tokens` and `woocommerce_payment_tokenmeta`: gateway token, card last 4 digits and expiry, PayPal email
     - `woocommerce_downloadable_product_permissions`: customer email
     - `wc_download_log`: IP address
     - `woocommerce_sessions`: replaced with an empty session
+    - `wc_stock_notifications`: back in stock sign-up email
+    - `wc_email_unsubscribes`: email hash (WooCommerce 11.0 and 11.1), replaced with a random hash
     - `comments`: content of order notes
 - `easy-digital-downloads.php` (EDD 3.x, plus EDD 2.x data left after upgrading)
     - `edd_customers`, `edd_customer_email_addresses` and `edd_customer_addresses`: name, email and address
