@@ -77,6 +77,21 @@ The anonymization rules live in the `config` directory, one file per plugin. Ord
     - `edd_subscriptions` (Recurring Payments): notes
     - `edd_license_activations` (Software Licensing): site URL
     - `usermeta` and `postmeta`: Stripe customer IDs, PayPal Express payer ID, EDD 2.x customer address, payment email and IP address, and file download and API request log IP addresses
+- `gravity-forms.php` (Gravity Forms 2.x, plus 1.x tables left after upgrading; loaded if a `gf_entry`, `gf_form` or `rg_lead` table exists)
+    - `gf_entry` and `rg_lead`: IP address, user agent and source URL
+    - `gf_entry_meta`, `rg_lead_detail` and `rg_lead_detail_long`: every field value, replaced with a sentence (see [Gravity Forms field values](#gravity-forms-field-values)). Entry meta that isn't a field value, such as add-on feed status, is kept
+    - `gf_entry_notes` and `rg_lead_notes`: note content and author name
+    - `gf_draft_submissions` and `rg_incomplete_submissions` (Save and Continue): email, IP address and source URL; the saved field values are replaced with an empty JSON object
+    - `gf_form_view` and `rg_form_view`: IP address
+- `redirection.php` (Redirection; loaded if a `redirection_404` or `redirection_logs` table exists)
+    - `redirection_404` and `redirection_logs`: IP address, user agent, referrer and request data (logged HTTP headers), replaced with an empty JSON object. The requested URL and domain are kept so the logs stay useful, so personal data in a logged URL's query string is not removed
+- `credentials.php` (always loaded; see [Credentials](#credentials))
+    - `usermeta`: application passwords, Two Factor TOTP secrets, backup codes and email tokens, Easy Digital Downloads API keys, Metorik cart tokens
+    - `postmeta` and `wc_orders_meta`: WooCommerce Print Invoice & Delivery Note guest access and PDF tokens, Metorik cart tokens, EDD 2.x API log keys and tokens, EDD Software Licensing 2.x license keys
+    - `woocommerce_api_keys`: consumer key and secret, truncated key and nonces
+    - `wc_webhooks`: secret and delivery URL
+    - `edd_logs_api_requests`: API key, token and request query string
+    - `edd_licenses`: license key
 
 Table names are given without the table prefix. On multisite, subsite tables such as `wp_2_postmeta` use the same rules as `wp_postmeta`.
 
@@ -98,6 +113,59 @@ To force a plugin's rules on or off, use the `wpmdb_anonymization_load_config_fi
         return $load;
     }
     add_filter( 'wpmdb_anonymization_load_config_file', 'my_wpmdb_anonymization_load_config_file', 10, 2 );
+
+### Credentials
+
+API keys, tokens and secrets aren't personal data, but they give access to the live site, its customers' orders and downloads, or the services it sends webhooks to, so `credentials.php` replaces them by default. Each is replaced with a random value of the same shape (for example 32 hexadecimal characters for an MD5-style key) so code that checks the format still works, but the replacements aren't working credentials: create new keys on the copy if you need them. Replacing webhook delivery URLs also stops the copy sending webhooks to live services.
+
+Two Factor TOTP secrets and backup codes are replaced too, so users who set up two-factor authentication on the live site, including whitelisted users, need to set it up again on the copy, or deactivate the Two Factor plugin there.
+
+To keep the original credentials, turn the file off:
+
+    add_filter( 'wpmdb_anonymization_load_config_file', function ( $load, $name ) {
+        return 'credentials' === $name ? false : $load;
+    }, 10, 2 );
+
+### Gravity Forms field values
+
+Gravity Forms stores each field value in `gf_entry_meta` under the field ID, such as `1`, or the field and input ID, such as `2.3` for the first name of a name field. Knowing which field is an email address, a phone number or a total would mean parsing every form, so every field value is replaced with a sentence. That includes product, quantity and total fields; the payment amount and status on the entry itself are kept.
+
+The rules for a column are tried in order and the first that matches the row is used, so to treat a form's fields differently, add rules to the start of the list. A constraint can check `form_id` as well as `meta_key`. Values are compared as strings:
+
+    add_filter( 'wpmdb_anonymization_config', function ( $config ) {
+        if ( ! isset( $config['gf_entry_meta'] ) ) {
+            return $config;
+        }
+
+        array_unshift(
+            $config['gf_entry_meta']['meta_value'],
+            // Field 2 of form 3 is an email address.
+            array(
+                'constraint'     => array( 'form_id' => '3', 'meta_key' => '2' ),
+                'fake_data_type' => 'email',
+            ),
+            // Field 5 of form 3 is a phone number.
+            array(
+                'constraint'     => array( 'form_id' => '3', 'meta_key' => '5' ),
+                'fake_data_type' => 'phoneNumber',
+            )
+        );
+
+        return $config;
+    } );
+
+To keep a field's values as they are, skip the rule for those rows with the `wpmdb_anonymization_pre_rule_valid` filter:
+
+    add_filter( 'wpmdb_anonymization_pre_rule_valid', function ( $valid, $rule, $row ) {
+        // Keep field 7 (a product drop-down) of form 3.
+        if ( isset( $row->entry_id, $row->form_id, $row->meta_key ) && '3' === (string) $row->form_id && '7' === $row->meta_key ) {
+            return false;
+        }
+
+        return $valid;
+    }, 10, 3 );
+
+Field IDs are matched with a regular expression, so the WP-CLI command reads every row of `gf_entry_meta` whether or not you add rules like these.
 
 ### Column constraints
 

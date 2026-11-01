@@ -62,6 +62,7 @@ Set a secret with the `WPMDB_ANONYMIZATION_SECRET` constant, the `wpmdb_anonymiz
 * New: `wp migrate-anonymize run` WP-CLI command to anonymize a database in place, without WP Migrate
 * New: `--rules` and `--prefix` options for `wp migrate-anonymize run`, and a `wpmdb_anonymization_config_files` filter, to anonymize with private rule files and tables under another prefix or none
 * New: Deterministic anonymization with a secret, keeping fake values consistent and unique across tables; fake email addresses, user names, domain names, URLs and hash-shaped values (md5, sha1, sha256, uuid) are also unique without a secret (#29)
+* Improvement: Anonymize Gravity Forms entries, notes and saved drafts and Redirection logs, and replace API keys, tokens and secrets (WordPress application passwords, Two Factor, WooCommerce, Easy Digital Downloads and others) with random values of the same shape; credentials can be kept with the `wpmdb_anonymization_load_config_file` filter
 
 = 0.3.4 - 2019-05-21 =
 
