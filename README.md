@@ -1,6 +1,12 @@
 WP Migrate DB Anonymization Addon
 ==========================================
 
+## Requirements
+
+- PHP 7.4+
+- WordPress 5.9+
+- [WP Migrate](https://deliciousbrains.com/wp-migrate-db-pro/) or [WP Migrate Lite](https://wordpress.org/plugins/wp-migrate-db/)
+
 ## Installation
 
 If you clone from this repository you will need to run `composer install` to complete the install of the plugin. The `vendor` directory is packaged with the plugin on the WordPress plugin repository:

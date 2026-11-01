@@ -1,10 +1,10 @@
 === WP Migrate DB Anonymization ===
 Contributors: deliciousbrains
 Tags: gdpr, anonymization, anonymize, anonymizer, anonymise, migrate, migration, export, data dump, backup, database, mysql
-Requires at least: 3.6
-Tested up to: 5.2
+Requires at least: 5.9
+Tested up to: 6.8
 Stable tag: 0.3.4
-Requires PHP: 5.3.3
+Requires PHP: 7.4
 License: GPLv3
 
 Addon for WP Migrate DB and WP Migrate DB Pro to anonymize user data on database export, pull or push.
@@ -14,6 +14,8 @@ Addon for WP Migrate DB and WP Migrate DB Pro to anonymize user data on database
 This addon requires [WP Migrate DB Pro](https://deliciousbrains.com/wp-migrate-db-pro) or [WP Migrate DB](https://wordpress.org/plugins/wp-migrate-db/).
 
 Ensure no user personal data is included when a database is exported, pulled or pushed using [WP Migrate DB](https://wordpress.org/plugins/wp-migrate-db/) (export) or [WP Migrate DB Pro](https://deliciousbrains.com/wp-migrate-db-pro) (export, pull, push).
+
+The addon should be installed on the live (source) site. This ensures any time the site's database is exported, pushed or pulled, the user data is anonymized.
 
 When the plugin is activated it will anonymize by default. You will need to deactivate the plugin to turn it off.
 
@@ -39,6 +41,13 @@ The configuration rules can be extended with a filter. [Learn how](https://githu
 2. Activate plugin
 
 == Changelog ==
+
+= Unreleased =
+
+* Improvement: Replace the abandoned fzaninotto/faker library with its maintained fork, fakerphp/faker
+* Improvement: Require PHP 7.4+ and WordPress 5.9+, tested up to WordPress 6.8
+* Improvement: PHP 8.x compatibility
+* Bug Fix: Fatal error instead of a notice when the vendor directory is missing
 
 = 0.3.4 - 2019-05-21 =
 

@@ -3,7 +3,8 @@
     "description": "An extension to WP Migrate DB Pro that anonymizes user data",
     "type": "wordpress-plugin",
     "require": {
-        "fzaninotto/faker": "^1.7"
+        "php": ">=7.4",
+        "fakerphp/faker": "^1.24"
     },
     "license": "GPLv3",
     "authors": [
@@ -19,5 +20,11 @@
       "files": [
         "includes/Compatibility.php"
       ]
+    },
+    "config": {
+        "platform": {
+            "php": "7.4"
+        },
+        "platform-check": false
     }
 }
