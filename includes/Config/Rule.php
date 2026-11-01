@@ -224,4 +224,93 @@ class Rule {
 
 		return empty( $values ) ? null : array( $column, $values );
 	}
+
+	/**
+	 * The column and SQL LIKE patterns covering this rule's regex constraint,
+	 * when the regex is simple enough to convert (see regex_to_like_patterns()).
+	 * Used by the WP-CLI command so a regex-only rule (e.g. a meta key with a
+	 * site prefix) doesn't force a full table scan.
+	 *
+	 * The patterns match at least every value the regex matches; valid() still
+	 * applies the regex to each row.
+	 *
+	 * @return array|null array( column, array patterns )
+	 */
+	public function get_constraint_like_patterns() {
+		if ( ! is_array( $this->constraint ) || 1 !== count( $this->constraint ) ) {
+			return null;
+		}
+
+		$expected = reset( $this->constraint );
+		$column   = key( $this->constraint );
+
+		if ( ! is_string( $column ) || ! is_array( $expected ) || ! isset( $expected['regex'] ) || array_key_exists( 'in', $expected ) ) {
+			return null;
+		}
+
+		$patterns = self::regex_to_like_patterns( $expected['regex'] );
+
+		return null === $patterns ? null : array( $column, $patterns );
+	}
+
+	/**
+	 * Convert a simple regular expression to SQL LIKE patterns that match a
+	 * superset of the values it matches, or null if it can't be done safely.
+	 *
+	 * Supported: optional `^` and `$` anchors, literal letters, digits, `_`, `-`
+	 * and escaped punctuation, and at most one group of literal alternatives,
+	 * optionally made optional with `?`, e.g. `/_wcpay_customer_id(_live|_test)?$/`.
+	 * Any flag (e.g. `i`) or other syntax returns null, so the caller scans the table.
+	 *
+	 * @param string $regex e.g. '/_stripe_customer_id$/'
+	 *
+	 * @return array|null LIKE patterns, with `!`, `%` and `_` escaped by `!` (use `ESCAPE '!'`).
+	 */
+	public static function regex_to_like_patterns( $regex ) {
+		if ( ! is_string( $regex ) || ! preg_match( '#^/(.*)/$#s', $regex, $m ) ) {
+			return null;
+		}
+
+		$body  = $m[1];
+		$start = '' !== $body && '^' === $body[0];
+		if ( $start ) {
+			$body = substr( $body, 1 );
+		}
+		$end = '' !== $body && '$' === substr( $body, -1 ) && '\\$' !== substr( $body, -2 );
+		if ( $end ) {
+			$body = substr( $body, 0, -1 );
+		}
+
+		$literal = '(?:[A-Za-z0-9_\-]|\\\\[^A-Za-z0-9])*';
+		if ( ! preg_match( '#^(' . $literal . ')(?:\(((?:' . $literal . ')(?:\|' . $literal . ')*)\)(\?)?(' . $literal . '))?$#', $body, $parts ) ) {
+			return null;
+		}
+
+		$unescape = function ( $text ) {
+			return preg_replace( '#\\\\(.)#', '$1', $text );
+		};
+
+		$before = $unescape( $parts[1] );
+		$after  = isset( $parts[4] ) ? $unescape( $parts[4] ) : '';
+		$middle = array( '' );
+		if ( isset( $parts[2] ) && '' !== $parts[2] ) {
+			$middle = array_map( $unescape, explode( '|', $parts[2] ) );
+			if ( ! empty( $parts[3] ) ) {
+				$middle[] = '';
+			}
+		}
+
+		$patterns = array();
+		foreach ( array_unique( $middle ) as $alternative ) {
+			$text = $before . $alternative . $after;
+			if ( '' === $text ) {
+				return null;
+			}
+			// `!` is the LIKE escape character: it means the same in MySQL and SQLite.
+			$escaped    = str_replace( array( '!', '%', '_' ), array( '!!', '!%', '!_' ), $text );
+			$patterns[] = ( $start ? '' : '%' ) . $escaped . ( $end ? '' : '%' );
+		}
+
+		return $patterns;
+	}
 }

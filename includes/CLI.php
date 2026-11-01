@@ -336,6 +336,7 @@ class CLI {
 	 */
 	protected function constraint_where( Anonymizer $anonymizer, $config_table, array $columns, array $table_columns ) {
 		$values = array();
+		$likes  = array();
 
 		foreach ( $columns as $column ) {
 			$rules = $anonymizer->rules( $config_table, $column );
@@ -345,23 +346,37 @@ class CLI {
 
 			foreach ( $rules as $rule ) {
 				$constraint = $rule->get_constraint_values();
+				if ( null !== $constraint && in_array( $constraint[0], $table_columns, true ) ) {
+					foreach ( $constraint[1] as $value ) {
+						$values[ $constraint[0] ][ $value ] = $value;
+					}
+					continue;
+				}
+
+				// A simple regex (e.g. a meta key with a site prefix) becomes LIKE patterns.
+				$constraint = $rule->get_constraint_like_patterns();
 				if ( null === $constraint || ! in_array( $constraint[0], $table_columns, true ) ) {
 					return '';
 				}
 
-				foreach ( $constraint[1] as $value ) {
-					$values[ $constraint[0] ][ $value ] = $value;
+				foreach ( $constraint[1] as $pattern ) {
+					$likes[ $constraint[0] ][ $pattern ] = $pattern;
 				}
 			}
 		}
 
 		$wpdb  = $this->wpdb();
 		$parts = array();
-		foreach ( $values as $column => $column_values ) {
-			$quoted       = $this->quote_identifier( $column );
-			$placeholders = implode( ', ', array_fill( 0, count( $column_values ), '%s' ) );
+		foreach ( array_unique( array_merge( array_keys( $values ), array_keys( $likes ) ) ) as $column ) {
+			$quoted = $this->quote_identifier( $column );
+			if ( ! empty( $values[ $column ] ) ) {
+				$placeholders = implode( ', ', array_fill( 0, count( $values[ $column ] ), '%s' ) );
+				$parts[]      = $wpdb->prepare( "{$quoted} IN ({$placeholders})", array_values( $values[ $column ] ) );
+			}
+			foreach ( isset( $likes[ $column ] ) ? $likes[ $column ] : array() as $pattern ) {
+				$parts[] = $wpdb->prepare( "{$quoted} LIKE %s ESCAPE '!'", $pattern );
+			}
 			// A NULL constraint column passes the rule check, so include those rows too.
-			$parts[] = $wpdb->prepare( "{$quoted} IN ({$placeholders})", array_values( $column_values ) );
 			$parts[] = "{$quoted} IS NULL";
 		}
 

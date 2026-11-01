@@ -119,6 +119,31 @@ class CLITest extends TestCase {
 		return array_column( \WP_CLI::$items, 'table' );
 	}
 
+	public function test_regex_constraint_is_pushed_into_sql_as_like() {
+		$this->wpdb->exec( 'CREATE TABLE "site_meta" ( meta_id INTEGER PRIMARY KEY, meta_key TEXT, meta_value TEXT )' );
+		$this->wpdb->exec( "INSERT INTO \"site_meta\" VALUES ( 1, 'wp__stripe_customer_id', 'cus_real1' ), ( 2, 'wp_3__stripe_customer_id', 'cus_real2' ), ( 3, 'wpXstripeXcustomerXid', 'keep-me' ), ( 4, 'locale', 'en_GB' ), ( 5, 'first_name', 'Alice' )" );
+
+		$file               = tempnam( sys_get_temp_dir(), 'wpmdba-rules' );
+		$this->temp_files[] = $file;
+		file_put_contents( $file, "<?php return array( 'site_meta' => array( 'meta_value' => array( array( 'constraint' => array( 'meta_key' => array( 'regex' => '/_stripe_customer_id\$/' ) ), 'fake_data_type' => 'ean13' ) ) ) );" );
+
+		$this->run_command( array( 'prefix' => '', 'rules' => $file, 'tables' => 'site_meta' ) );
+
+		$summary = array_values( array_filter( \WP_CLI::$items, function ( $item ) {
+			return 'site_meta' === $item['table'];
+		} ) );
+		$this->assertCount( 1, $summary );
+		// Only the two matching keys are read: `_` is escaped, so wpXstripeXcustomerXid isn't fetched.
+		$this->assertSame( 2, (int) $summary[0]['scanned'] );
+		$this->assertSame( 2, (int) $summary[0]['changed'] );
+
+		$rows = $this->wpdb->rows( 'site_meta' );
+		$this->assertNotSame( 'cus_real1', $rows['1']->meta_value );
+		$this->assertNotSame( 'cus_real2', $rows['2']->meta_value );
+		$this->assertSame( 'keep-me', $rows['3']->meta_value );
+		$this->assertSame( 'en_GB', $rows['4']->meta_value );
+	}
+
 	/**
 	 * @dataProvider valid_prefix_provider
 	 */
