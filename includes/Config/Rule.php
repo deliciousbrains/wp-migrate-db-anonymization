@@ -179,38 +179,44 @@ class Rule {
 	}
 
 	/**
-	 * The column/value pair this rule is limited to, when the constraint is a
-	 * plain equality check (e.g. `array( 'meta_key' => 'billing_email' )`).
-	 * Used by the WP-CLI command to push the constraint into SQL.
+	 * The column and fixed set of values this rule is limited to, when the
+	 * constraint is an exact match (`array( 'meta_key' => 'billing_email' )`)
+	 * or a list (`array( 'meta_key' => array( 'in' => array( ... ) ) )` or a
+	 * plain array of values). Used by the WP-CLI command to push the
+	 * constraint into SQL.
+	 *
+	 * A list combined with a regex still returns the list: rows must be in it
+	 * to match, and the regex is applied afterwards by valid().
 	 *
 	 * Returns null when the rule could match rows with any value in the
-	 * column (no constraint, a callback constraint, or a non-equality match).
+	 * column (no constraint, a callback constraint, or a regex on its own).
 	 *
-	 * @return array|null array( column, value )
+	 * @return array|null array( column, array values )
 	 */
-	public function get_equality_constraint() {
+	public function get_constraint_values() {
 		if ( ! is_array( $this->constraint ) || 1 !== count( $this->constraint ) ) {
 			return null;
 		}
 
-		$value  = reset( $this->constraint );
-		$column = key( $this->constraint );
+		$expected = reset( $this->constraint );
+		$column   = key( $this->constraint );
 
-		if ( ! is_string( $column ) || ! ( is_string( $value ) || is_int( $value ) ) ) {
+		if ( ! is_string( $column ) ) {
 			return null;
 		}
 
-		$value = (string) $value;
-
-		// Probe the constraint so pattern-style matching is never treated as equality.
-		$matches = function ( $candidate ) use ( $column ) {
-			return $this->valid_column_constraint( (object) array( $column => $candidate ) );
-		};
-
-		if ( ! $matches( $value ) || $matches( 'x' . $value ) || $matches( $value . 'x' ) ) {
+		if ( is_string( $expected ) || is_int( $expected ) ) {
+			$values = array( $expected );
+		} elseif ( is_array( $expected ) && array_key_exists( 'in', $expected ) ) {
+			$values = (array) $expected['in'];
+		} elseif ( is_array( $expected ) && ! array_key_exists( 'regex', $expected ) ) {
+			$values = $expected;
+		} else {
 			return null;
 		}
 
-		return array( $column, $value );
+		$values = array_values( array_unique( array_map( 'strval', array_filter( $values, 'is_scalar' ) ) ) );
+
+		return empty( $values ) ? null : array( $column, $values );
 	}
 }

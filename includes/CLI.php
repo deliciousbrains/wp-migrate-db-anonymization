@@ -315,12 +315,14 @@ class CLI {
 			}
 
 			foreach ( $rules as $rule ) {
-				$constraint = $rule->get_equality_constraint();
+				$constraint = $rule->get_constraint_values();
 				if ( null === $constraint || ! in_array( $constraint[0], $table_columns, true ) ) {
 					return '';
 				}
 
-				$values[ $constraint[0] ][ $constraint[1] ] = $constraint[1];
+				foreach ( $constraint[1] as $value ) {
+					$values[ $constraint[0] ][ $value ] = $value;
+				}
 			}
 		}
 
@@ -338,25 +340,18 @@ class CLI {
 	}
 
 	/**
-	 * Load the config without WP Migrate, capturing the final (filtered) rules
+	 * Load the config without WP Migrate. The Loader normally defers loading
+	 * until a migration needs it, so load it now and hand the result to Config
 	 * so the command knows which tables and columns to process.
 	 *
 	 * @return array array( Config, array $schema )
 	 */
 	protected function load_config() {
-		$schema  = array();
-		$capture = function ( $data ) use ( &$schema ) {
-			$schema = is_array( $data ) ? $data : array();
-
-			return $data;
-		};
-
-		add_filter( 'wpmdb_anonymization_config', $capture, PHP_INT_MAX );
 		$loader = new Loader( $this->plugin_file_path );
-		$config = $loader->init( new Config( $this->wpdb(), null ) );
-		remove_filter( 'wpmdb_anonymization_config', $capture, PHP_INT_MAX );
+		$schema = array_filter( $loader->load( $this->wpdb() ), 'is_array' );
 
-		$schema = array_filter( $schema, 'is_array' );
+		$config = new Config( $this->wpdb(), null );
+		$config->init( $schema );
 
 		return array( $config, $schema );
 	}

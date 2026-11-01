@@ -109,18 +109,34 @@ class DeterministicTest extends TestCase {
 		);
 	}
 
-	public function test_equality_constraint() {
+	public function test_constraint_values() {
 		$rule = new Rule( 'usermeta', 'meta_value' );
 		$rule->load( array( 'constraint' => array( 'meta_key' => 'billing_email' ), 'fake_data_type' => 'email' ) );
-		$this->assertSame( array( 'meta_key', 'billing_email' ), $rule->get_equality_constraint() );
+		$this->assertSame( array( 'meta_key', array( 'billing_email' ) ), $rule->get_constraint_values() );
+
+		$rule = new Rule( 'postmeta', 'meta_value' );
+		$rule->load( array( 'constraint' => array( 'meta_key' => array( 'in' => array( '_billing_city', '_shipping_city' ) ) ), 'fake_data_type' => 'city' ) );
+		$this->assertSame( array( 'meta_key', array( '_billing_city', '_shipping_city' ) ), $rule->get_constraint_values() );
+
+		$rule = new Rule( 'postmeta', 'meta_value' );
+		$rule->load( array( 'constraint' => array( 'meta_key' => array( '_billing_city', 5 ) ), 'fake_data_type' => 'city' ) );
+		$this->assertSame( array( 'meta_key', array( '_billing_city', '5' ) ), $rule->get_constraint_values() );
+
+		$rule = new Rule( 'postmeta', 'meta_value' );
+		$rule->load( array( 'constraint' => array( 'meta_key' => array( 'in' => array( 'tel-1', 'tel-2' ), 'regex' => '/^tel-1$/' ) ), 'fake_data_type' => 'phoneNumber' ) );
+		$this->assertSame( array( 'meta_key', array( 'tel-1', 'tel-2' ) ), $rule->get_constraint_values() );
+
+		$rule = new Rule( 'usermeta', 'meta_value' );
+		$rule->load( array( 'constraint' => array( 'meta_key' => array( 'regex' => '/_stripe_customer_id$/' ) ), 'fake_data_type' => 'ean13' ) );
+		$this->assertNull( $rule->get_constraint_values() );
 
 		$rule = new Rule( 'users', 'user_email' );
 		$rule->load( array( 'constraint' => 'WPMDB\\Anonymization\\Config\\Constraint::is_not_whitelisted_user', 'fake_data_type' => 'email' ) );
-		$this->assertNull( $rule->get_equality_constraint() );
+		$this->assertNull( $rule->get_constraint_values() );
 
 		$rule = new Rule( 'comments', 'comment_author' );
 		$rule->load( array( 'fake_data_type' => 'userName' ) );
-		$this->assertNull( $rule->get_equality_constraint() );
+		$this->assertNull( $rule->get_constraint_values() );
 	}
 
 	/**
