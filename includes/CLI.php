@@ -47,6 +47,12 @@ class CLI {
 	 * [--tables=<tables>]
 	 * : Comma-separated list of config tables to process, without the table prefix (e.g. users,usermeta). Defaults to every table in the anonymization config.
 	 *
+	 * [--prefix=<prefix>]
+	 * : Process tables with this table prefix instead of the site's, e.g. a second WordPress install in the same database. Use --prefix='' for table names exactly as written in the rules. Treated as a single site: multisite subsites are not processed and global tables (users, usermeta) use this prefix too.
+	 *
+	 * [--rules=<files>]
+	 * : Comma-separated paths to extra rule files, in the same format as the plugin's config/*.php files. Their rules are added to the bundled rules for this run.
+	 *
 	 * [--secret=<secret>]
 	 * : Secret for deterministic anonymization. Overrides the WPMDB_ANONYMIZATION_SECRET constant and the wpmdb_anonymization_secret filter. Without a secret, fake values are random.
 	 *
@@ -76,6 +82,15 @@ class CLI {
 	 *     # Only the users tables, with an explicit secret.
 	 *     $ wp migrate-anonymize run --tables=users,usermeta --secret="$ANON_SECRET" --yes
 	 *
+	 *     # Add private rules kept outside the plugin.
+	 *     $ wp migrate-anonymize run --rules=/path/private-rules.php --yes
+	 *
+	 *     # Tables of a second install that uses the "shop_" prefix.
+	 *     $ wp migrate-anonymize run --prefix=shop_ --yes
+	 *
+	 *     # Unprefixed tables named exactly as in a private rules file.
+	 *     $ wp migrate-anonymize run --prefix='' --rules=/path/private-rules.php --tables=my_backup_table --yes
+	 *
 	 * @when after_wp_load
 	 *
 	 * @param array $args
@@ -95,12 +110,26 @@ class CLI {
 			WP_CLI::error( '--secret requires a value.' );
 		}
 
+		$prefix     = $this->prefix_option( $assoc_args );
+		$rule_files = $this->rule_files_option( $assoc_args );
+
 		$environment = function_exists( 'wp_get_environment_type' ) ? wp_get_environment_type() : '';
 		if ( 'production' === $environment && ! $force && ! $dry_run ) {
 			WP_CLI::error( 'The environment type is "production". Anonymizing permanently overwrites data, so it only runs on copies of a database. Use --force if this really is a copy.' );
 		}
 
-		list( $config, $schema ) = $this->load_config();
+		if ( ! empty( $rule_files ) ) {
+			$this->add_rule_files( $rule_files );
+			WP_CLI::log( sprintf( 'Extra rules: %s', implode( ', ', $rule_files ) ) );
+		}
+
+		if ( '' === $prefix ) {
+			WP_CLI::log( 'No table prefix: table names are used exactly as in the rules.' );
+		} elseif ( null !== $prefix ) {
+			WP_CLI::log( sprintf( 'Table prefix: %s', $prefix ) );
+		}
+
+		list( $config, $schema ) = $this->load_config( $prefix );
 
 		$only = null;
 		if ( isset( $assoc_args['tables'] ) ) {
@@ -111,7 +140,7 @@ class CLI {
 			}
 		}
 
-		$targets = $this->resolve_targets( array_keys( $schema ), $only );
+		$targets = $this->resolve_targets( array_keys( $schema ), $only, $prefix );
 		if ( empty( $targets ) ) {
 			WP_CLI::error( 'None of the configured tables exist in this database.' );
 		}
@@ -344,11 +373,16 @@ class CLI {
 	 * until a migration needs it, so load it now and hand the result to Config
 	 * so the command knows which tables and columns to process.
 	 *
+	 * With --prefix, the Loader checks which plugins' data exists (e.g. the
+	 * WooCommerce tables) under that prefix rather than the site's.
+	 *
+	 * @param string|null $prefix
+	 *
 	 * @return array array( Config, array $schema )
 	 */
-	protected function load_config() {
+	protected function load_config( $prefix = null ) {
 		$loader = new Loader( $this->plugin_file_path );
-		$schema = array_filter( $loader->load( $this->wpdb() ), 'is_array' );
+		$schema = array_filter( $loader->load( null === $prefix ? $this->wpdb() : $this->wpdb_for_prefix( $prefix ) ), 'is_array' );
 
 		$config = new Config( $this->wpdb(), null );
 		$config->init( $schema );
@@ -361,21 +395,25 @@ class CLI {
 	 * usermeta) use the base prefix; on multisite, other tables are processed
 	 * for every site.
 	 *
-	 * @param array      $config_tables
-	 * @param array|null $only
+	 * With an explicit prefix (--prefix), every table, global or not, uses that
+	 * prefix once: it is treated as a single site. An empty prefix means the
+	 * table names exactly as written in the config.
+	 *
+	 * @param array       $config_tables
+	 * @param array|null  $only
+	 * @param string|null $prefix
 	 *
 	 * @return array
 	 */
-	protected function resolve_targets( array $config_tables, $only = null ) {
-		$wpdb     = $this->wpdb();
-		$global   = array_merge( (array) $wpdb->global_tables, (array) $wpdb->ms_global_tables );
-		$prefixes = array( $wpdb->prefix );
+	protected function resolve_targets( array $config_tables, $only = null, $prefix = null ) {
+		$wpdb = $this->wpdb();
 
-		if ( function_exists( 'is_multisite' ) && is_multisite() ) {
-			$prefixes = array();
-			foreach ( get_sites( array( 'fields' => 'ids', 'number' => 0 ) ) as $blog_id ) {
-				$prefixes[] = $wpdb->get_blog_prefix( $blog_id );
-			}
+		if ( null !== $prefix ) {
+			$global   = array();
+			$prefixes = array( $prefix );
+		} else {
+			$global   = array_merge( (array) $wpdb->global_tables, (array) $wpdb->ms_global_tables );
+			$prefixes = $this->site_prefixes();
 		}
 
 		$targets = array();
@@ -385,8 +423,8 @@ class CLI {
 			}
 
 			$table_prefixes = in_array( $config_table, $global, true ) ? array( $wpdb->base_prefix ) : $prefixes;
-			foreach ( $table_prefixes as $prefix ) {
-				$table = $prefix . $config_table;
+			foreach ( $table_prefixes as $table_prefix ) {
+				$table = $table_prefix . $config_table;
 				if ( ! $this->table_exists( $table ) ) {
 					WP_CLI::debug( sprintf( 'Skipping %s: table does not exist.', $table ), 'migrate-anonymize' );
 					continue;
@@ -400,6 +438,170 @@ class CLI {
 		}
 
 		return $targets;
+	}
+
+	/**
+	 * Table prefixes of the sites in this install: the site's prefix, or on
+	 * multisite the prefix of every site.
+	 *
+	 * @return array
+	 */
+	protected function site_prefixes() {
+		$wpdb = $this->wpdb();
+
+		if ( ! function_exists( 'is_multisite' ) || ! is_multisite() ) {
+			return array( $wpdb->prefix );
+		}
+
+		$prefixes = array();
+		foreach ( get_sites( array( 'fields' => 'ids', 'number' => 0 ) ) as $blog_id ) {
+			$prefixes[] = $wpdb->get_blog_prefix( $blog_id );
+		}
+
+		return $prefixes;
+	}
+
+	/**
+	 * The --prefix option: null when not given, otherwise a validated prefix,
+	 * which may be empty.
+	 *
+	 * @param array $assoc_args
+	 *
+	 * @return string|null
+	 */
+	protected function prefix_option( array $assoc_args ) {
+		if ( ! array_key_exists( 'prefix', $assoc_args ) || null === $assoc_args['prefix'] ) {
+			return null;
+		}
+
+		$prefix = $assoc_args['prefix'];
+		if ( true === $prefix ) {
+			WP_CLI::error( "--prefix requires a value. Use --prefix='' for table names exactly as written in the rules." );
+		}
+
+		$prefix = (string) $prefix;
+		if ( ! self::is_valid_prefix( $prefix ) ) {
+			WP_CLI::error( sprintf( 'Invalid --prefix "%s": use only letters, digits and underscores, or an empty value.', $prefix ) );
+		}
+
+		return $prefix;
+	}
+
+	/**
+	 * Letters, digits and underscores only, as WordPress requires for
+	 * $table_prefix. An empty prefix is allowed.
+	 *
+	 * @param mixed $prefix
+	 *
+	 * @return bool
+	 */
+	public static function is_valid_prefix( $prefix ) {
+		return is_string( $prefix ) && 1 === preg_match( '/^[A-Za-z0-9_]*\z/', $prefix );
+	}
+
+	/**
+	 * The --rules option: absolute paths of extra rule files, each checked to
+	 * exist and return an array.
+	 *
+	 * @param array $assoc_args
+	 *
+	 * @return array
+	 */
+	protected function rule_files_option( array $assoc_args ) {
+		if ( ! array_key_exists( 'rules', $assoc_args ) || null === $assoc_args['rules'] ) {
+			return array();
+		}
+
+		$value = $assoc_args['rules'];
+		$paths = true === $value ? array() : array_filter( array_map( 'trim', explode( ',', (string) $value ) ), 'strlen' );
+		if ( empty( $paths ) ) {
+			WP_CLI::error( '--rules requires the path to a rules file.' );
+		}
+
+		$files = array();
+		foreach ( $paths as $path ) {
+			$file = realpath( $path );
+			if ( false === $file || ! is_file( $file ) || ! is_readable( $file ) ) {
+				WP_CLI::error( sprintf( 'Rules file not found: %s', $path ) );
+			}
+
+			try {
+				$rules = $this->include_rules_file( $file );
+			} catch ( \Throwable $e ) {
+				WP_CLI::error( sprintf( 'Could not load rules file %s: %s', $file, $e->getMessage() ) );
+			}
+
+			if ( ! is_array( $rules ) ) {
+				WP_CLI::error( sprintf( 'Rules file %s must return an array of rules (table => column => rule), like the files in the plugin\'s config directory. It returned %s.', $file, gettype( $rules ) ) );
+			}
+
+			if ( ! in_array( $file, $files, true ) ) {
+				$files[] = $file;
+			}
+		}
+
+		return $files;
+	}
+
+	/**
+	 * Include a rules file in its own scope.
+	 *
+	 * @return mixed
+	 */
+	protected function include_rules_file() {
+		return include func_get_arg( 0 );
+	}
+
+	/**
+	 * Add extra rule files to the Loader for this run. They are merged with
+	 * the bundled rules by the Loader.
+	 *
+	 * @param array $files Absolute paths.
+	 */
+	protected function add_rule_files( array $files ) {
+		add_filter(
+			'wpmdb_anonymization_config_files',
+			function ( $config_files ) use ( $files ) {
+				return array_merge( is_array( $config_files ) ? $config_files : array(), $files );
+			}
+		);
+	}
+
+	/**
+	 * A copy of wpdb whose prefix and table name properties use another
+	 * prefix, so the Loader's checks for plugin data look at those tables. It
+	 * shares the database connection; errors are suppressed on the copy
+	 * because a table such as usermeta may not exist under that prefix.
+	 *
+	 * @param string $prefix
+	 *
+	 * @return \wpdb
+	 */
+	protected function wpdb_for_prefix( $prefix ) {
+		$wpdb = $this->wpdb();
+		$copy = clone $wpdb;
+
+		$copy->base_prefix = $prefix;
+		$copy->prefix      = $prefix;
+
+		$tables = array();
+		foreach ( array( 'tables', 'old_tables', 'global_tables', 'ms_global_tables', 'old_ms_global_tables' ) as $list ) {
+			if ( isset( $wpdb->{$list} ) && is_array( $wpdb->{$list} ) ) {
+				$tables = array_merge( $tables, $wpdb->{$list} );
+			}
+		}
+
+		foreach ( $tables as $table ) {
+			if ( is_string( $table ) && property_exists( $copy, $table ) ) {
+				$copy->{$table} = $prefix . $table;
+			}
+		}
+
+		if ( method_exists( $copy, 'suppress_errors' ) ) {
+			$copy->suppress_errors( true );
+		}
+
+		return $copy;
 	}
 
 	/**

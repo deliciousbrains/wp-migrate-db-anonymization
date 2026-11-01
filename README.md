@@ -132,9 +132,20 @@ The `wp migrate-anonymize run` command anonymizes the current database in place,
     # Only some tables, with a secret for deterministic output (see below)
     wp migrate-anonymize run --tables=users,usermeta --secret="$ANONYMIZATION_SECRET" --yes
 
+    # Add private rules kept outside the plugin (see "Private rule files" below)
+    wp migrate-anonymize run --rules=/path/private-rules.php --yes
+
+    # A second WordPress install in the same database, using the shop_ prefix
+    wp migrate-anonymize run --prefix=shop_ --yes
+
+    # Unprefixed tables, named exactly as in the rules, e.g. my_backup_table
+    wp migrate-anonymize run --prefix='' --rules=/path/private-rules.php --tables=my_backup_table --yes
+
 Options:
 
-- `--tables=<tables>`: comma-separated config tables, without the table prefix (`users`, `usermeta`, `comments`, `postmeta`, plus any added with the `wpmdb_anonymization_config` filter). Defaults to all of them.
+- `--tables=<tables>`: comma-separated config tables, without the table prefix (`users`, `usermeta`, `comments`, `postmeta`, plus any added with the `wpmdb_anonymization_config` filter or a rules file). Defaults to all of them.
+- `--prefix=<prefix>`: process the tables with this prefix instead of the site's `$table_prefix`, for example a second WordPress install in the same database or plugin tables without the WordPress prefix. `--prefix=''` means no prefix: table names are used exactly as written in the rules, so a rule for `my_backup_table` processes the `my_backup_table` table. The prefix may only contain letters, digits and underscores. It is treated as a single site: multisite subsites aren't processed, and the global `users` and `usermeta` tables use this prefix too. The checks for which plugins' data exists (e.g. WooCommerce tables) also use it.
+- `--rules=<files>`: comma-separated paths to extra [rule files](#private-rule-files), added to the bundled rules for this run. The command stops with an error if a file doesn't exist or doesn't return an array.
 - `--secret=<secret>`: enables [deterministic anonymization](#deterministic-anonymization). Takes precedence over the constant and filter.
 - `--batch-size=<number>`: rows fetched per query. Default `1000`.
 - `--dry-run`: count the rows that would change and write nothing.
@@ -163,7 +174,7 @@ How it works:
 - Rows are read in batches ordered by primary key and changed values are written back row by row. Tables without a single-column primary key are skipped with a warning.
 - When every rule for a table is limited to specific values of a column, as with the `meta_key` rules for `usermeta` and `postmeta`, only those rows are read (`WHERE meta_key IN (...)`) instead of the whole table.
 - The user whitelist constant and filter are respected, and empty values are left empty.
-- On multisite, `users` and `usermeta` are processed once and the other tables are processed for every site.
+- On multisite, `users` and `usermeta` are processed once and the other tables are processed for every site, unless `--prefix` is given.
 - The object cache is flushed afterwards.
 
 Run it once per database. Running it again anonymizes the already fake values, which then no longer match values anonymized from the original data.
