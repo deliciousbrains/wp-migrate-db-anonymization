@@ -66,7 +66,10 @@ class LoaderTest extends TestCase {
 			}
 		);
 
-		$this->make_loader( 'plugin-merge' )->init( $this->make_inspectable_config() );
+		$config = $this->make_loader( 'plugin-merge' )->init( $this->make_inspectable_config() );
+		$this->assertNull( $received, 'Config is loaded on first use, not by init().' );
+
+		$config->has_table( 'users' );
 
 		$this->assertIsArray( $received );
 		$this->assertSame( array( 'users', 'usermeta', 'postmeta' ), array_keys( $received ) );
@@ -133,12 +136,6 @@ class LoaderTest extends TestCase {
 	}
 
 	public function test_single_rule_column_defined_in_two_files_merges_into_valid_rules() {
-		$this->markTestSkipped(
-			'Known bug: Loader::load_files() uses array_merge_recursive(), so when two config files both define the same '
-			. 'column as a single rule (not a list of rules) the values are merged key by key, e.g. '
-			. '"fake_data_type" => array( "email", "safeEmail" ), producing a rule that cannot be anonymized.'
-		);
-
 		$config = $this->make_loader( 'plugin-collision' )->init( $this->make_inspectable_config() );
 
 		foreach ( $config->rules( 'users', 'user_email' ) as $rule ) {
