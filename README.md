@@ -295,7 +295,7 @@ Install the development dependencies with `composer install`.
 
 ### Running tests
 
-The unit tests use PHPUnit and run without a WordPress install. The small set of WordPress functions and classes the plugin uses (`apply_filters()`, `wp_hash_password()`, `WP_User`, `wpdb` and so on) are stubbed in `tests/stubs/`.
+The unit tests use PHPUnit and run without a WordPress install. The small set of WordPress functions and classes the plugin uses (`apply_filters()`, `wp_hash_password()`, `WP_User`, `wpdb` and so on) are stubbed in `tests/stubs/`, as is the WP-CLI API. The WP-CLI command tests run against an in-memory SQLite database, so they need the `pdo_sqlite` extension.
 
     composer test
 
