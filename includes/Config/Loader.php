@@ -120,6 +120,13 @@ class Loader {
 			'easy-digital-downloads' => array(
 				'tables' => array( 'edd_customers', 'edd_orders' ),
 			),
+			'gravity-forms'          => array(
+				// Gravity Forms 2.x, or 1.x tables left after upgrading.
+				'tables' => array( 'gf_entry', 'gf_form', 'rg_lead' ),
+			),
+			'redirection'            => array(
+				'tables' => array( 'redirection_404', 'redirection_logs' ),
+			),
 		);
 	}
 
