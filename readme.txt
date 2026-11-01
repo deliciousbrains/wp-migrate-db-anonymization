@@ -15,7 +15,7 @@ This addon requires [WP Migrate DB Pro](https://deliciousbrains.com/wp-migrate-d
 
 Ensure no user personal data is included when a database is exported, pulled or pushed using [WP Migrate DB](https://wordpress.org/plugins/wp-migrate-db/) (export) or [WP Migrate DB Pro](https://deliciousbrains.com/wp-migrate-db-pro) (export, pull, push).
 
-The addon should be installed on the live (source) site. This ensures any time the site's database is exported, pushed or pulled, the user data is anonymized.
+The addon should be installed on the live (source) site. This ensures any time the site's database is exported, pushed or pulled, the user data is anonymized. A notice is shown on the Plugins and WP Migrate screens as a reminder, tailored to the site's environment type.
 
 When the plugin is activated it will anonymize by default. You will need to deactivate the plugin to turn it off.
 
@@ -44,6 +44,7 @@ The configuration rules can be extended with a filter. [Learn how](https://githu
 
 = Unreleased =
 
+* New: Admin notice on the Plugins and WP Migrate screens explaining that the addon belongs on the live (source) site, tailored to the site's environment type
 * Improvement: Replace the abandoned fzaninotto/faker library with its maintained fork, fakerphp/faker
 * Improvement: Require PHP 7.4+ and WordPress 5.9+, tested up to WordPress 6.8
 * Improvement: PHP 8.x compatibility
