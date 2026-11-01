@@ -22,12 +22,19 @@ class Config {
 	/**
 	 * @var array
 	 */
-	protected $data;
+	protected $data = array();
 
 	/**
 	 * @var array
 	 */
-	protected $tables;
+	protected $tables = array();
+
+	/**
+	 * Callback that returns the config data, called the first time it is needed.
+	 *
+	 * @var callable|null
+	 */
+	protected $loader;
 
 	/**
 	 * Cache of raw table name => cleaned table name.
@@ -48,8 +55,30 @@ class Config {
 	}
 
 	public function init( array $config ) {
+		$this->loader = null;
 		$this->data   = $config;
 		$this->tables = array_keys( $config );
+	}
+
+	/**
+	 * Defer loading the config until a migration actually needs it, so the
+	 * table checks done by the loader don't run on every request.
+	 *
+	 * @param callable $loader Receives the wpdb instance and returns the config array.
+	 */
+	public function init_deferred( $loader ) {
+		$this->loader = $loader;
+	}
+
+	protected function maybe_load() {
+		if ( null === $this->loader ) {
+			return;
+		}
+
+		$loader       = $this->loader;
+		$this->loader = null;
+
+		$this->init( (array) call_user_func( $loader, $this->wpdb ) );
 	}
 
 	/**
@@ -106,7 +135,9 @@ class Config {
 	}
 
 	public function has_table( $table ) {
-		return in_array( $table, $this->tables );
+		$this->maybe_load();
+
+		return isset( $this->data[ $table ] );
 	}
 
 	public function has_column( $table, $column ) {
@@ -118,6 +149,8 @@ class Config {
 	}
 
 	public function rules( $table, $column ) {
+		$this->maybe_load();
+
 		$rules = $this->data[ $table ][ $column ];
 		if ( ! isset( $rules[0] ) || ! is_array( $rules[0] ) ) {
 			// Ensure we always return an array of rules
