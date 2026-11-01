@@ -35,10 +35,7 @@ jobs:
         run: composer validate --no-check-publish --no-check-all
 
       - name: Install dependencies
-        # fzaninotto/faker caps PHP at ^7.0 even though it runs on PHP 8, so the
-        # upper-bound PHP check is ignored. Drop the flag once the plugin depends
-        # on fakerphp/faker.
-        run: composer install --no-interaction --no-progress --prefer-dist --ignore-platform-req=php+
+        run: composer install --no-interaction --no-progress --prefer-dist
 
       - name: Run tests
         run: composer test
