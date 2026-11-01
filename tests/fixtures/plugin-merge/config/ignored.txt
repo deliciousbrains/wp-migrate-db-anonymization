@@ -1,0 +1,1 @@
+Not a PHP file, so the Loader must ignore it.
