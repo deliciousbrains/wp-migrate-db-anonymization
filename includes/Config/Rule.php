@@ -104,23 +104,37 @@ class Rule {
 	}
 
 
+	/**
+	 * Check a row against a column constraint, e.g.
+	 *
+	 *     array( 'meta_key' => '_billing_email' )                         // Exact match
+	 *     array( 'meta_key' => array( 'in' => array( 'a', 'b' ) ) )        // One of a list
+	 *     array( 'meta_key' => array( 'a', 'b' ) )                         // Shorthand for 'in'
+	 *     array( 'meta_key' => array( 'regex' => '/^_billing_/' ) )        // Regular expression
+	 *
+	 * When several columns are given, all of them must match. A column that is
+	 * not present on the row is ignored.
+	 *
+	 * @param object $row
+	 *
+	 * @return bool
+	 */
 	protected function valid_column_constraint( $row ) {
 		if ( ! is_array( $this->constraint ) ) {
 			return true;
 		}
 
-		$column = key( $this->constraint );
-		$value  = current( $this->constraint );
+		foreach ( $this->constraint as $column => $expected ) {
+			if ( ! isset( $row->{$column} ) ) {
+				continue;
+			}
 
-		if ( ! isset( $row->{$column} ) ) {
-			return true;
+			if ( ! Constraint::column_matches( $row->{$column}, $expected ) ) {
+				return false;
+			}
 		}
 
-		if ( $row->{$column} === $value ) {
-			return true;
-		}
-
-		return false;
+		return true;
 	}
 
 	public function anonymize( $faker ) {
