@@ -51,7 +51,7 @@ The anonymization rules live in the `config` directory, one file per plugin. Ord
 
 - `wordpress.php` (always loaded)
     - `users`: login, password, nicename, email, URL and display name
-    - `usermeta`: first name, last name, nickname, description, `session_tokens` and `community-events-location` (both store IP addresses)
+    - `usermeta`: first name, last name, nickname, description, `session_tokens` and `community-events-location` (both store IP addresses), `_new_email` (pending email change) and `signup_ip` (registration IP written by membership and registration plugins)
     - `comments`: author, email, URL, IP address and user agent
 - `woocommerce.php`, including WooCommerce Subscriptions, which stores subscriptions as orders
     - `usermeta`: customer billing and shipping details, Stripe and WooPayments customer IDs

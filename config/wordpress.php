@@ -46,11 +46,17 @@ return array(
 				'fake_data_type' => 'sentence',
 			),
 			array(
-				// Login sessions and the dashboard events location both store IP addresses.
-				// Replace with an empty serialized array.
-				'constraint'     => array( 'meta_key' => array( 'in' => array( 'session_tokens', 'community-events-location' ) ) ),
+				// Login sessions and the dashboard events location both store IP addresses,
+				// and a pending email change stores the new address. Replace with an empty
+				// serialized array.
+				'constraint'     => array( 'meta_key' => array( 'in' => array( 'session_tokens', 'community-events-location', '_new_email' ) ) ),
 				'fake_data_type' => 'randomElement',
 				'fake_data_args' => array( array( 'a:0:{}' ) ),
+			),
+			array(
+				// Registration IP, written by several membership and registration plugins.
+				'constraint'     => array( 'meta_key' => 'signup_ip' ),
+				'fake_data_type' => 'ipv4',
 			),
 		),
 	),

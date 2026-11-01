@@ -50,6 +50,7 @@ The configuration rules can be extended with a filter. [Learn how](https://githu
 * Improvement: PHP 8.x compatibility
 * Bug Fix: Fatal error instead of a notice when the vendor directory is missing
 * Improvement: Anonymize WooCommerce HPOS orders, customer lookup, payment tokens, downloads and sessions, Easy Digital Downloads 3 customers, orders and logs, and comment user agents; only load a plugin's rules when its data is in the database (#27); match multisite subsite tables (#28); support list and regex column constraints (#19)
+* Improvement: Anonymize pending email changes and signup IP addresses in user meta
 
 = 0.3.4 - 2019-05-21 =
 
