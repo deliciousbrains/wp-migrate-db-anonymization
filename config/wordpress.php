@@ -45,6 +45,13 @@ return array(
 				'constraint'     => array( 'meta_key' => 'description' ),
 				'fake_data_type' => 'sentence',
 			),
+			array(
+				// Login sessions and the dashboard events location both store IP addresses.
+				// Replace with an empty serialized array.
+				'constraint'     => array( 'meta_key' => array( 'in' => array( 'session_tokens', 'community-events-location' ) ) ),
+				'fake_data_type' => 'randomElement',
+				'fake_data_args' => array( array( 'a:0:{}' ) ),
+			),
 		),
 	),
 	'comments' => array(
@@ -59,6 +66,9 @@ return array(
 		),
 		'comment_author_IP'    => array(
 			'fake_data_type' => 'ipv4',
+		),
+		'comment_agent'        => array(
+			'fake_data_type' => 'userAgent',
 		),
 	),
 );

@@ -49,6 +49,7 @@ The configuration rules can be extended with a filter. [Learn how](https://githu
 * Improvement: Require PHP 7.4+ and WordPress 5.9+, tested up to WordPress 6.8
 * Improvement: PHP 8.x compatibility
 * Bug Fix: Fatal error instead of a notice when the vendor directory is missing
+* Improvement: Anonymize WooCommerce HPOS orders, customer lookup, payment tokens, downloads and sessions, Easy Digital Downloads 3 customers, orders and logs, and comment user agents; only load a plugin's rules when its data is in the database (#27); match multisite subsite tables (#28); support list and regex column constraints (#19)
 
 = 0.3.4 - 2019-05-21 =
 

@@ -45,6 +45,73 @@ You can also programmatically control which users are whitelisted with the follo
     }
     add_filter( 'wpmdb_anonymization_user_whitelisted', 'my_wpmdb_anonymization_user_whitelisted', 10, 2 );
     
+## Covered data
+
+The anonymization rules live in the `config` directory, one file per plugin. Order totals, dates, statuses, product data and IDs are never changed, so reports run on an anonymized copy still add up.
+
+- `wordpress.php` (always loaded)
+    - `users`: login, password, nicename, email, URL and display name
+    - `usermeta`: first name, last name, nickname, description, `session_tokens` and `community-events-location` (both store IP addresses)
+    - `comments`: author, email, URL, IP address and user agent
+- `woocommerce.php`, including WooCommerce Subscriptions, which stores subscriptions as orders
+    - `usermeta`: customer billing and shipping details, Stripe and WooPayments customer IDs
+    - `postmeta` and `wc_orders_meta`: order billing and shipping details, address search index, customer IP address and user agent, Stripe customer ID, PayPal Standard payer details
+    - `wc_orders`: billing email, IP address, user agent and customer note
+    - `wc_order_addresses`: name, company, address, email and phone
+    - `wc_customer_lookup`: username, name, email, location and phone numbers
+    - `woocommerce_payment_tokens` and `woocommerce_payment_tokenmeta`: gateway token, card last 4 digits and expiry
+    - `woocommerce_downloadable_product_permissions`: customer email
+    - `wc_download_log`: IP address
+    - `woocommerce_sessions`: replaced with an empty session
+    - `comments`: content of order notes
+- `easy-digital-downloads.php` (EDD 3.x, plus EDD 2.x data left after upgrading)
+    - `edd_customers`, `edd_customer_email_addresses` and `edd_customer_addresses`: name, email and address
+    - `edd_orders` and `edd_order_addresses`: email, IP address, name and address
+    - `edd_customermeta` and `edd_ordermeta`: company, phone, last login IP, additional emails, Stripe and PayPal customer IDs
+    - `edd_notes`: note content
+    - `edd_payment_tokens`: gateway token and customer ID
+    - `edd_logs_api_requests`, `edd_logs_file_downloads` and `edd_logs_emails`: IP address, user agent and email
+    - `usermeta` and `postmeta`: Stripe customer IDs and EDD 2.x payment email and IP address
+
+Table names are given without the table prefix. On multisite, subsite tables such as `wp_2_postmeta` use the same rules as `wp_postmeta`.
+
+A plugin's rules are only loaded if its data is in the database, whether or not the plugin is active: WooCommerce if a `woocommerce_order_items`, `wc_orders` or `wc_customer_lookup` table exists for any site, or customer billing details remain in `usermeta`; Easy Digital Downloads if an `edd_customers` or `edd_orders` table exists. Sites without these plugins don't spend time checking their rules during a migration. The rules are loaded, and the `wpmdb_anonymization_config` filter applied, the first time they are needed during a migration rather than on every request.
+
+To force a plugin's rules on or off, use the `wpmdb_anonymization_load_config_file` filter:
+
+    /**
+     * @param bool   $load Whether the plugin's data was found in the database.
+     * @param string $name Config file name without extension, e.g. 'woocommerce'.
+     *
+     * @return bool
+     */
+    function my_wpmdb_anonymization_load_config_file( $load, $name ) {
+        if ( 'easy-digital-downloads' === $name ) {
+            return true;
+        }
+
+        return $load;
+    }
+    add_filter( 'wpmdb_anonymization_load_config_file', 'my_wpmdb_anonymization_load_config_file', 10, 2 );
+
+### Column constraints
+
+A rule's `constraint` can limit it to rows where another column has a particular value. Besides an exact value, it accepts a list of values or a regular expression (including delimiters):
+
+    // Exact value
+    'constraint' => array( 'meta_key' => 'billing_phone' ),
+
+    // Any of these values
+    'constraint' => array( 'meta_key' => array( 'in' => array( 'billing_phone', 'shipping_phone' ) ) ),
+
+    // Shorthand for 'in'
+    'constraint' => array( 'meta_key' => array( 'billing_phone', 'shipping_phone' ) ),
+
+    // Regular expression, e.g. tel-1, tel-110, tel-211
+    'constraint' => array( 'field_name' => array( 'regex' => '/^tel-\d+$/' ) ),
+
+If a constraint lists several columns, all of them must match.
+
 ## Extending
 
 The rules for anonymization can be extended using the `wpmdb_anonymization_config` filter, added to a plugin or mu-plugin file:
