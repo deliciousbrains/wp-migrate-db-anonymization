@@ -68,13 +68,15 @@ The anonymization rules live in the `config` directory, one file per plugin. Ord
     - `wc_email_unsubscribes`: email hash (WooCommerce 11.0 and 11.1), replaced with a random hash
     - `comments`: content of order notes
 - `easy-digital-downloads.php` (EDD 3.x, plus EDD 2.x data left after upgrading)
-    - `edd_customers`, `edd_customer_email_addresses` and `edd_customer_addresses`: name, email and address
+    - `edd_customers`, `edd_customer_email_addresses` and `edd_customer_addresses`: name, email, address and EDD 2.x customer notes
     - `edd_orders` and `edd_order_addresses`: email, IP address, name and address
-    - `edd_customermeta` and `edd_ordermeta`: company, phone, last login IP, additional emails, Stripe and PayPal customer IDs
+    - `edd_customermeta` and `edd_ordermeta`: company, phone, last login IP, additional emails, Stripe and PayPal customer IDs, PayPal Express payer ID, EDD Invoices company and VAT number
     - `edd_notes`: note content
     - `edd_payment_tokens`: gateway token and customer ID
     - `edd_logs_api_requests`, `edd_logs_file_downloads` and `edd_logs_emails`: IP address, user agent and email
-    - `usermeta` and `postmeta`: Stripe customer IDs and EDD 2.x payment email and IP address
+    - `edd_subscriptions` (Recurring Payments): notes
+    - `edd_license_activations` (Software Licensing): site URL
+    - `usermeta` and `postmeta`: Stripe customer IDs, PayPal Express payer ID, EDD 2.x customer address, payment email and IP address, and file download and API request log IP addresses
 
 Table names are given without the table prefix. On multisite, subsite tables such as `wp_2_postmeta` use the same rules as `wp_postmeta`.
 

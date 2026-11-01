@@ -18,8 +18,8 @@ $address_rules = array(
 );
 
 $gateway_customer_id_rule = array(
-	// Stripe and PayPal customer IDs, live and test mode.
-	'constraint'     => array( 'meta_key' => array( 'regex' => '/^(_edd_stripe_customer_id|_edd_paypal_vault_customer_id)(_test)?$/' ) ),
+	// Stripe and PayPal customer IDs, live and test mode, and PayPal Express payer ID.
+	'constraint'     => array( 'meta_key' => array( 'in' => array( '_edd_stripe_customer_id', '_edd_stripe_customer_id_test', '_edd_paypal_vault_customer_id', '_edd_paypal_vault_customer_id_test', '_edd_eppe_payer_id' ) ) ),
 	'fake_data_type' => 'ean13',
 );
 
@@ -27,6 +27,8 @@ return array(
 	'edd_customers'                => array(
 		'email' => array( 'fake_data_type' => 'email' ),
 		'name'  => array( 'fake_data_type' => 'name' ),
+		// EDD 2.x customer notes, dropped once EDD 3 has moved them to edd_notes.
+		'notes' => array( 'fake_data_type' => 'sentence' ),
 	),
 	'edd_customer_email_addresses' => array(
 		'email' => array( 'fake_data_type' => 'email' ),
@@ -69,6 +71,17 @@ return array(
 				'constraint'     => array( 'meta_key' => '_edd_phone' ),
 				'fake_data_type' => 'phoneNumber',
 			),
+			array(
+				// EDD Invoices.
+				'constraint'     => array( 'meta_key' => 'invoices_company' ),
+				'fake_data_type' => 'company',
+			),
+			array(
+				// EDD Invoices VAT number, which can identify a sole trader.
+				'constraint'     => array( 'meta_key' => 'invoices_vat' ),
+				'fake_data_type' => 'regexify',
+				'fake_data_args' => array( '[A-Z]{2}[0-9]{9}' ),
+			),
 			$gateway_customer_id_rule,
 		),
 	),
@@ -90,8 +103,23 @@ return array(
 	'edd_logs_emails'              => array(
 		'email' => array( 'fake_data_type' => 'email' ),
 	),
+	'edd_subscriptions'            => array(
+		// EDD Recurring Payments subscription notes.
+		'notes' => array( 'fake_data_type' => 'sentence' ),
+	),
+	'edd_license_activations'      => array(
+		// EDD Software Licensing stores the customer's site URL without the protocol
+		// or www, e.g. example.com.
+		'site_name' => array( 'fake_data_type' => 'domainName' ),
+	),
 	'usermeta'                     => array(
 		'meta_value' => array(
+			array(
+				// EDD 2.x customer address, a serialized array. Replace with an empty one.
+				'constraint'     => array( 'meta_key' => '_edd_user_address' ),
+				'fake_data_type' => 'randomElement',
+				'fake_data_args' => array( array( 'a:0:{}' ) ),
+			),
 			$gateway_customer_id_rule,
 		),
 	),
@@ -103,9 +131,11 @@ return array(
 				'fake_data_type' => 'email',
 			),
 			array(
-				'constraint'     => array( 'meta_key' => '_edd_payment_user_ip' ),
+				// EDD 2.x payment IP and file download and API request log IPs.
+				'constraint'     => array( 'meta_key' => array( 'in' => array( '_edd_payment_user_ip', '_edd_log_ip', '_edd_log_request_ip' ) ) ),
 				'fake_data_type' => 'ipv4',
 			),
+			$gateway_customer_id_rule,
 		),
 	),
 );
