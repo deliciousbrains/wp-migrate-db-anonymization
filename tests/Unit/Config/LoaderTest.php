@@ -206,8 +206,15 @@ class LoaderTest extends TestCase {
 		$this->assertArrayNotHasKey( 'wc_orders', $data );
 		$this->assertArrayNotHasKey( 'edd_customers', $data );
 
+		// Files with no requirements (wordpress.php, credentials.php) always load, plus the extra file's rule.
 		$shipped        = self::shipped_config_files();
-		$expected_rules = count( $shipped['wordpress.php']['usermeta']['meta_value'] ) + 1;
+		$expected_rules = 1;
+		foreach ( array( 'wordpress.php', 'credentials.php' ) as $file ) {
+			if ( isset( $shipped[ $file ]['usermeta']['meta_value'] ) ) {
+				$rules           = $shipped[ $file ]['usermeta']['meta_value'];
+				$expected_rules += isset( $rules[0] ) && is_array( $rules[0] ) ? count( $rules ) : 1;
+			}
+		}
 		$this->assertCount( $expected_rules, $data['usermeta']['meta_value'] );
 	}
 

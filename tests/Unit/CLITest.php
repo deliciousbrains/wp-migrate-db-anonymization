@@ -683,7 +683,8 @@ class CLITest extends TestCase {
 			)
 		);
 
-		$this->assertSame( array( 'shop_users', 'shop_usermeta' ), $this->summary_tables() );
+		// Order follows the rule files (credentials.php also has usermeta rules), so compare contents.
+		$this->assertEqualsCanonicalizing( array( 'shop_users', 'shop_usermeta' ), $this->summary_tables() );
 
 		$users = $this->wpdb->rows( 'shop_users' );
 		$this->assertMatchesPattern( self::EMAIL_PATTERN, $users['1']->user_email );
