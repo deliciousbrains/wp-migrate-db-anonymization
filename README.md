@@ -238,6 +238,46 @@ If you need to pass arguments to the Faker data method then you can define this 
     
     add_filter( 'wpmdb_anonymization_config', 'my_wpmdb_anonymization_rules' );
 
+### Private rule files
+
+Rules you'd rather not put in a plugin, for example for a custom table, can live in a plain PHP file that returns an array in the same format as the bundled `config/*.php` files:
+
+    <?php
+    // private-rules.php
+    return array(
+        'my_backup_table' => array(
+            'email'     => array(
+                'fake_data_type' => 'email',
+            ),
+            'full_name' => array(
+                'fake_data_type' => 'name',
+            ),
+        ),
+        'usermeta'        => array(
+            'meta_value' => array(
+                array(
+                    'constraint'     => array( 'meta_key' => 'private_phone' ),
+                    'fake_data_type' => 'phoneNumber',
+                ),
+            ),
+        ),
+    );
+
+Add it to every export, push and pull with the `wpmdb_anonymization_config_files` filter, which receives the absolute paths of the rule files to load, bundled files first:
+
+    add_filter( 'wpmdb_anonymization_config_files', function ( $files ) {
+        $files[] = WP_CONTENT_DIR . '/private-rules.php';
+
+        return $files;
+    } );
+
+or to a single WP-CLI run with `--rules=/path/private-rules.php` (see [WP-CLI](#wp-cli)).
+
+- Table names are written without the table prefix, as in the bundled files. With the WP-CLI `--prefix=''` option they are used exactly as written, so a rule for `my_backup_table` processes the table `my_backup_table`.
+- Extra files are merged with the bundled rules. If both define the same table and column, both sets of rules are kept, bundled rules first, and each value uses the first rule whose constraint matches. Rules with different constraints, such as different `meta_key` values, therefore all apply. To replace a bundled rule for the same rows, change it with the `wpmdb_anonymization_config` filter instead.
+- Extra files have no requirements, so they are always loaded. The `wpmdb_anonymization_load_config_file` filter receives their file name without `.php` (e.g. `private-rules`) and can turn them off. Don't name a file after a bundled one (`wordpress.php`, `woocommerce.php`, `easy-digital-downloads.php`), or that file's requirements apply to it.
+- The file should only return an array, without declaring functions or classes: the WP-CLI command includes it once to check it before the rules are loaded. Paths that aren't files are skipped by the filter; `--rules` reports them as an error.
+
 ## Development
 
 Install the development dependencies with `composer install`.
