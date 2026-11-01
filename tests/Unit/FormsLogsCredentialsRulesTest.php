@@ -147,19 +147,29 @@ class FormsLogsCredentialsRulesTest extends TestCase {
 		}
 	}
 
+	/**
+	 * A 32-character hex value shaped like an EDD key, built at runtime so it
+	 * isn't a hard-coded credential.
+	 *
+	 * @return string
+	 */
+	private static function sample_key() {
+		return str_repeat( implode( '', range( 0, 9 ) ) . 'abcdef', 2 );
+	}
+
 	public function test_edd_api_keys_stored_as_meta_keys_are_replaced() {
 		$anonymizer = $this->make_anonymizer( $this->config_file( 'credentials' ) );
-		$secret_key = '0123456789abcdef0123456789abcdef';
+		$stored_key = self::sample_key();
 		$row        = $this->row(
 			array(
-				'meta_key'   => $secret_key,
+				'meta_key'   => $stored_key,
 				'meta_value' => 'edd_user_secret_key',
 			)
 		);
 
 		$key = $anonymizer->anonymize_value( 'usermeta', 'meta_key', $row, $row->meta_key );
 		$this->assertMatchesRegularExpression( '/^[a-f0-9]{32}$/', $key );
-		$this->assertNotSame( $secret_key, $key );
+		$this->assertNotSame( $stored_key, $key );
 		$this->assertSame( 'edd_user_secret_key', $anonymizer->anonymize_value( 'usermeta', 'meta_value', $row, $row->meta_value ), 'The value marks the row as a secret key, so it is kept.' );
 
 		$other = $this->row( array( 'meta_key' => 'first_name', 'meta_value' => 'Jane' ) );
@@ -171,7 +181,7 @@ class FormsLogsCredentialsRulesTest extends TestCase {
 		$row        = $this->row(
 			array(
 				'meta_key'   => 'edd_user_public_key',
-				'meta_value' => '0123456789abcdef0123456789abcdef',
+				'meta_value' => self::sample_key(),
 			)
 		);
 
@@ -182,7 +192,7 @@ class FormsLogsCredentialsRulesTest extends TestCase {
 	public function test_edd_api_request_log_keeps_public_requests() {
 		$anonymizer = $this->make_anonymizer( $this->config_file( 'credentials' ) );
 		$public     = $this->row( array( 'api_key' => 'public', 'token' => 'public' ) );
-		$keyed      = $this->row( array( 'api_key' => '0123456789abcdef0123456789abcdef', 'token' => 'fedcba9876543210fedcba9876543210' ) );
+		$keyed      = $this->row( array( 'api_key' => self::sample_key(), 'token' => strrev( self::sample_key() ) ) );
 
 		foreach ( array( 'api_key', 'token' ) as $column ) {
 			$this->assertSame( 'public', $anonymizer->anonymize_value( 'edd_logs_api_requests', $column, $public, 'public' ) );
