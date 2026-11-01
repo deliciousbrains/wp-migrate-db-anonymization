@@ -151,7 +151,8 @@ class Deterministic {
 
 		try {
 			if ( $this->is_unique_type( $fake_data_type ) ) {
-				$value = $this->unique_value( $fake_data_type, $faker->userName(), substr( $hash, 32, self::FRAGMENT_LENGTH ) );
+				$base  = $this->is_domain_type( $fake_data_type ) ? $faker->domainWord() : $faker->userName();
+				$value = $this->unique_value( $fake_data_type, $base, substr( $hash, 32, self::FRAGMENT_LENGTH ) );
 			} else {
 				$value = call_user_func_array( array( $faker, $fake_data_type ), $args );
 			}
@@ -181,20 +182,31 @@ class Deterministic {
 	 */
 	public function generate_random_unique( $faker, $fake_data_type ) {
 		$fragment = bin2hex( random_bytes( (int) ( self::FRAGMENT_LENGTH / 2 ) ) );
+		$base     = $this->is_domain_type( $fake_data_type ) ? $faker->domainWord() : $faker->userName();
 
-		return $this->unique_value( $fake_data_type, $faker->userName(), $fragment );
+		return $this->unique_value( $fake_data_type, $base, $fragment );
 	}
 
 	/**
-	 * Is this a type whose fake values must not collide (email addresses and
-	 * user names)?
+	 * Is this a type whose fake values must not collide (email addresses, user
+	 * names, domain names and URLs)? Domains and URLs are often unique too,
+	 * e.g. EDD Software Licensing's UNIQUE (site_name, license_id).
 	 *
 	 * @param string $fake_data_type
 	 *
 	 * @return bool
 	 */
 	public function is_unique_type( $fake_data_type ) {
-		return $this->is_email_type( $fake_data_type ) || $this->is_username_type( $fake_data_type );
+		return $this->is_email_type( $fake_data_type ) || $this->is_username_type( $fake_data_type ) || $this->is_domain_type( $fake_data_type );
+	}
+
+	/**
+	 * @param string $fake_data_type
+	 *
+	 * @return bool
+	 */
+	public function is_domain_type( $fake_data_type ) {
+		return in_array( $fake_data_type, array( 'domainName', 'url' ), true );
 	}
 
 	/**
@@ -243,7 +255,7 @@ class Deterministic {
 	public function normalise( $fake_data_type, $original ) {
 		$value = trim( (string) $original );
 
-		if ( $this->is_email_type( $fake_data_type ) || $this->is_username_type( $fake_data_type ) ) {
+		if ( $this->is_email_type( $fake_data_type ) || $this->is_username_type( $fake_data_type ) || 'domainName' === $fake_data_type ) {
 			$value = function_exists( 'mb_strtolower' ) ? mb_strtolower( $value, 'UTF-8' ) : strtolower( $value );
 		}
 
@@ -281,6 +293,14 @@ class Deterministic {
 	 * @return string
 	 */
 	protected function unique_value( $fake_data_type, $username, $fragment ) {
+		if ( $this->is_domain_type( $fake_data_type ) ) {
+			// A subdomain of the reserved domain, so the fake never resolves to a real site.
+			$label  = trim( preg_replace( '/[^a-z0-9]+/', '-', strtolower( $username ) ), '-' );
+			$domain = ( '' === $label ? 'site' : substr( $label, 0, 40 ) ) . '-' . $fragment . '.' . self::EMAIL_DOMAIN;
+
+			return 'url' === $fake_data_type ? 'https://' . $domain . '/' : $domain;
+		}
+
 		$value = $this->unique_local_part( $username, $fragment );
 		if ( $this->is_email_type( $fake_data_type ) ) {
 			$value .= '@' . self::EMAIL_DOMAIN;

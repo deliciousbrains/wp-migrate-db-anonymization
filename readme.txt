@@ -41,7 +41,7 @@ Anonymize the current database in place with `wp migrate-anonymize run`, using t
 
 = Deterministic anonymization =
 
-Set a secret with the `WPMDB_ANONYMIZATION_SECRET` constant, the `wpmdb_anonymization_secret` filter or the `--secret` CLI option, and the same original value always becomes the same fake value across tables, rows and runs, so joins and distinct counts still work on the anonymized data. Fake email addresses and user names include a hash fragment so they don't collide. Without a secret they get a random fragment in the same format, so they are unique either way. Keep the secret private: anyone with it can test guesses against the fake values. [Learn more](https://github.com/deliciousbrains/wp-migrate-db-anonymization#deterministic-anonymization).
+Set a secret with the `WPMDB_ANONYMIZATION_SECRET` constant, the `wpmdb_anonymization_secret` filter or the `--secret` CLI option, and the same original value always becomes the same fake value across tables, rows and runs, so joins and distinct counts still work on the anonymized data. Fake email addresses, user names, domain names and URLs include a hash fragment so they don't collide. Without a secret they get a random fragment in the same format, so they are unique either way. Keep the secret private: anyone with it can test guesses against the fake values. [Learn more](https://github.com/deliciousbrains/wp-migrate-db-anonymization#deterministic-anonymization).
 
 == Installation ==
 
@@ -61,7 +61,7 @@ Set a secret with the `WPMDB_ANONYMIZATION_SECRET` constant, the `wpmdb_anonymiz
 * Improvement: Anonymize pending email changes and signup IP addresses in user meta; WooCommerce order attribution user agents, VAT numbers, PayPal Express and Stripe card IDs, PayPal token emails, coupon email restrictions and back in stock sign-ups; Easy Digital Downloads customer and subscription notes, license activation sites, EDD Invoices details, PayPal Express payer IDs and EDD 2.x addresses and log IP addresses
 * New: `wp migrate-anonymize run` WP-CLI command to anonymize a database in place, without WP Migrate
 * New: `--rules` and `--prefix` options for `wp migrate-anonymize run`, and a `wpmdb_anonymization_config_files` filter, to anonymize with private rule files and tables under another prefix or none
-* New: Deterministic anonymization with a secret, keeping fake values consistent and unique across tables; fake email addresses and user names are also unique without a secret (#29)
+* New: Deterministic anonymization with a secret, keeping fake values consistent and unique across tables; fake email addresses, user names, domain names and URLs are also unique without a secret (#29)
 
 = 0.3.4 - 2019-05-21 =
 
