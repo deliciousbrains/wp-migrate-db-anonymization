@@ -3,6 +3,8 @@
 
 namespace WPMDB\Anonymization\Config;
 
+use WPMDB\Anonymization\Deterministic;
+
 class Rule {
 
 	/**
@@ -137,7 +139,19 @@ class Rule {
 		return true;
 	}
 
-	public function anonymize( $faker ) {
+	/**
+	 * Generate the fake value for this rule.
+	 *
+	 * When the original value is passed and a secret is configured, the output
+	 * is deterministic: the same original always produces the same fake value.
+	 *
+	 * @param \Faker\Generator   $faker
+	 * @param mixed|null         $original      The value being replaced.
+	 * @param Deterministic|null $deterministic Defaults to one built from the environment.
+	 *
+	 * @return mixed
+	 */
+	public function anonymize( $faker, $original = null, $deterministic = null ) {
 		if ( empty( $this->fake_data_type ) ) {
 			return '';
 		}
@@ -147,12 +161,56 @@ class Rule {
 			$args = $this->fake_data_args;
 		}
 
-		$data = call_user_func_array( array( $faker, $this->fake_data_type ), $args );
+		if ( null !== $original && null === $deterministic ) {
+			$deterministic = Deterministic::from_environment();
+		}
+
+		if ( $deterministic instanceof Deterministic && $deterministic->applies( $this->fake_data_type, $original ) ) {
+			$data = $deterministic->generate( $faker, $this->fake_data_type, $args, $original );
+		} else {
+			$data = call_user_func_array( array( $faker, $this->fake_data_type ), $args );
+		}
 
 		if ( ! empty( $this->post_process_function ) && is_callable( $this->post_process_function ) ) {
 			$data = call_user_func( $this->post_process_function, $data );
 		}
 
 		return $data;
+	}
+
+	/**
+	 * The column/value pair this rule is limited to, when the constraint is a
+	 * plain equality check (e.g. `array( 'meta_key' => 'billing_email' )`).
+	 * Used by the WP-CLI command to push the constraint into SQL.
+	 *
+	 * Returns null when the rule could match rows with any value in the
+	 * column (no constraint, a callback constraint, or a non-equality match).
+	 *
+	 * @return array|null array( column, value )
+	 */
+	public function get_equality_constraint() {
+		if ( ! is_array( $this->constraint ) || 1 !== count( $this->constraint ) ) {
+			return null;
+		}
+
+		$value  = reset( $this->constraint );
+		$column = key( $this->constraint );
+
+		if ( ! is_string( $column ) || ! ( is_string( $value ) || is_int( $value ) ) ) {
+			return null;
+		}
+
+		$value = (string) $value;
+
+		// Probe the constraint so pattern-style matching is never treated as equality.
+		$matches = function ( $candidate ) use ( $column ) {
+			return $this->valid_column_constraint( (object) array( $column => $candidate ) );
+		};
+
+		if ( ! $matches( $value ) || $matches( 'x' . $value ) || $matches( $value . 'x' ) ) {
+			return null;
+		}
+
+		return array( $column, $value );
 	}
 }

@@ -18,14 +18,21 @@ class Migration {
 	protected $faker;
 
 	/**
+	 * @var Anonymizer
+	 */
+	protected $anonymizer;
+
+	/**
 	 * Migration constructor.
 	 *
-	 * @param Config    $config
-	 * @param Generator $faker
+	 * @param Config          $config
+	 * @param Generator       $faker
+	 * @param Anonymizer|null $anonymizer
 	 */
-	public function __construct( Config $config, Generator $faker ) {
-		$this->config = $config;
-		$this->faker  = $faker;
+	public function __construct( Config $config, Generator $faker, $anonymizer = null ) {
+		$this->config     = $config;
+		$this->faker      = $faker;
+		$this->anonymizer = $anonymizer instanceof Anonymizer ? $anonymizer : new Anonymizer( $config, $faker );
 	}
 
 	/**
@@ -62,13 +69,29 @@ class Migration {
 			return $data;
 		}
 
-		$row = $wpmdb_replace->get_row();
-		foreach ( $this->config->rules( $table, $column ) as $rule ) {
-			if ( ! $rule->valid( $row ) ) {
-				continue;
-			}
+		$row  = $wpmdb_replace->get_row();
+		$rule = $this->anonymizer->matching_rule( $table, $column, $row );
+		if ( null === $rule ) {
+			return $data;
+		}
 
-			return $rule->anonymize( $this->faker );
+		return $this->anonymizer->generate( $rule, $this->original_value( $data, $row, $column ) );
+	}
+
+	/**
+	 * The value to derive deterministic output from. Prefer the raw column value
+	 * from the source row (before WP Migrate's find & replace) so the result
+	 * matches the WP-CLI command run on the same data; fall back to $data.
+	 *
+	 * @param mixed  $data
+	 * @param object $row
+	 * @param string $column
+	 *
+	 * @return mixed
+	 */
+	protected function original_value( $data, $row, $column ) {
+		if ( is_object( $row ) && isset( $row->{$column} ) && is_scalar( $row->{$column} ) && '' !== $row->{$column} ) {
+			return $row->{$column};
 		}
 
 		return $data;
