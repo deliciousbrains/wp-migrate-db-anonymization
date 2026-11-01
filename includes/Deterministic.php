@@ -15,6 +15,10 @@ namespace WPMDB\Anonymization;
  * by the secret. Values that need to stay unique (email addresses and user
  * names) also get a fragment of that HMAC embedded, so two different originals
  * can't produce the same fake value.
+ *
+ * Without a secret, the same uniqueness-sensitive types get a random fragment
+ * in the same format instead (see generate_random_unique()), so fake email
+ * addresses and user names don't collide in random mode either.
  */
 class Deterministic {
 
@@ -24,8 +28,8 @@ class Deterministic {
 	const VERSION = 'v1';
 
 	/**
-	 * Length (in hex characters) of the HMAC fragment embedded in unique values.
-	 * 12 hex characters = 48 bits.
+	 * Length (in hex characters) of the HMAC or random fragment embedded in
+	 * unique values. 12 hex characters = 48 bits.
 	 */
 	const FRAGMENT_LENGTH = 12;
 
@@ -146,11 +150,8 @@ class Deterministic {
 		$faker->seed( $this->seed_from_hash( $hash ) );
 
 		try {
-			if ( $this->is_email_type( $fake_data_type ) || $this->is_username_type( $fake_data_type ) ) {
-				$value = $this->unique_local_part( $faker->userName(), $hash );
-				if ( $this->is_email_type( $fake_data_type ) ) {
-					$value .= '@' . self::EMAIL_DOMAIN;
-				}
+			if ( $this->is_unique_type( $fake_data_type ) ) {
+				$value = $this->unique_value( $fake_data_type, $faker->userName(), substr( $hash, 32, self::FRAGMENT_LENGTH ) );
 			} else {
 				$value = call_user_func_array( array( $faker, $fake_data_type ), $args );
 			}
@@ -160,6 +161,40 @@ class Deterministic {
 		}
 
 		return $value;
+	}
+
+	/**
+	 * Generate a random but unique value for a uniqueness-sensitive type
+	 * (email addresses and user names) when no secret is configured.
+	 *
+	 * Faker's own output repeats on large data sets, which breaks unique
+	 * columns (for example a plugin table with a UNIQUE email column). WP
+	 * Migrate also boots a fresh Faker for every request, so Faker's unique()
+	 * modifier can't help. Instead a random fragment from random_bytes() is
+	 * embedded, in the same format as deterministic mode, so collisions are
+	 * as unlikely as there and the output looks the same in both modes.
+	 *
+	 * @param \Faker\Generator $faker
+	 * @param string           $fake_data_type
+	 *
+	 * @return string
+	 */
+	public function generate_random_unique( $faker, $fake_data_type ) {
+		$fragment = bin2hex( random_bytes( (int) ( self::FRAGMENT_LENGTH / 2 ) ) );
+
+		return $this->unique_value( $fake_data_type, $faker->userName(), $fragment );
+	}
+
+	/**
+	 * Is this a type whose fake values must not collide (email addresses and
+	 * user names)?
+	 *
+	 * @param string $fake_data_type
+	 *
+	 * @return bool
+	 */
+	public function is_unique_type( $fake_data_type ) {
+		return $this->is_email_type( $fake_data_type ) || $this->is_username_type( $fake_data_type );
 	}
 
 	/**
@@ -236,15 +271,35 @@ class Deterministic {
 	}
 
 	/**
-	 * Build a unique local part: a sanitised Faker user name plus an HMAC
-	 * fragment taken from different bits of the hash than the seed.
+	 * A unique user name, or email address at the reserved domain, built from
+	 * a Faker user name and a hex fragment.
 	 *
+	 * @param string $fake_data_type
 	 * @param string $username
-	 * @param string $hash
+	 * @param string $fragment
 	 *
 	 * @return string
 	 */
-	protected function unique_local_part( $username, $hash ) {
+	protected function unique_value( $fake_data_type, $username, $fragment ) {
+		$value = $this->unique_local_part( $username, $fragment );
+		if ( $this->is_email_type( $fake_data_type ) ) {
+			$value .= '@' . self::EMAIL_DOMAIN;
+		}
+
+		return $value;
+	}
+
+	/**
+	 * Build a unique local part: a sanitised Faker user name plus a fragment.
+	 * In deterministic mode the fragment comes from different bits of the HMAC
+	 * than the seed; in random mode it comes from random_bytes().
+	 *
+	 * @param string $username
+	 * @param string $fragment
+	 *
+	 * @return string
+	 */
+	protected function unique_local_part( $username, $fragment ) {
 		$username = strtolower( (string) preg_replace( '/[^A-Za-z0-9._-]/', '', (string) $username ) );
 		$username = trim( substr( $username, 0, 30 ), '._-' );
 
@@ -252,7 +307,7 @@ class Deterministic {
 			$username = 'user';
 		}
 
-		return $username . '.' . substr( $hash, 32, self::FRAGMENT_LENGTH );
+		return $username . '.' . $fragment;
 	}
 
 	/**

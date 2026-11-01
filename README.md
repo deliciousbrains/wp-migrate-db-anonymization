@@ -170,7 +170,9 @@ Run it once per database. Running it again anonymizes the already fake values, w
 
 ## Deterministic anonymization
 
-By default every fake value is random, so the same email address becomes a different fake address in each table and row. That breaks joins and distinct counts on the anonymized data, and on large databases random values can collide.
+By default every fake value is random, so the same email address becomes a different fake address in each table and row. That breaks joins and distinct counts on the anonymized data.
+
+Fake email addresses and user names are unique in both modes, so columns with a unique index, such as a newsletter plugin's subscriber email, don't break on large databases. They always look like `kshlerin.rosalind.3f9a0c1b2d4e@example.com`: a Faker user name, a 12-character hex fragment and, for email addresses, the reserved `example.com` domain. Without a secret the fragment is random (from `random_bytes()`); with one it comes from the HMAC described below. Other values, such as names and cities, are not made unique and can repeat in random mode, just as they do in real data.
 
 Configure a secret to make anonymization deterministic, in wp-config.php:
 

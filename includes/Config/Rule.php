@@ -144,6 +144,9 @@ class Rule {
 	 *
 	 * When the original value is passed and a secret is configured, the output
 	 * is deterministic: the same original always produces the same fake value.
+	 * When the original value is passed without a secret, email addresses and
+	 * user names get a random fragment so they stay unique. Without the
+	 * original value, Faker's output is returned as is.
 	 *
 	 * @param \Faker\Generator   $faker
 	 * @param mixed|null         $original      The value being replaced.
@@ -167,6 +170,8 @@ class Rule {
 
 		if ( $deterministic instanceof Deterministic && $deterministic->applies( $this->fake_data_type, $original ) ) {
 			$data = $deterministic->generate( $faker, $this->fake_data_type, $args, $original );
+		} elseif ( null !== $original && $deterministic instanceof Deterministic && $deterministic->is_unique_type( $this->fake_data_type ) ) {
+			$data = $deterministic->generate_random_unique( $faker, $this->fake_data_type );
 		} else {
 			$data = call_user_func_array( array( $faker, $this->fake_data_type ), $args );
 		}
