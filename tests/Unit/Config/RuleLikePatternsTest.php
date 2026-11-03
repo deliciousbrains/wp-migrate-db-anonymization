@@ -24,6 +24,9 @@ class RuleLikePatternsTest extends TestCase {
 			'required alternatives'   => array( '/^edd_(public|secret)_key$/', array( 'edd!_public!_key', 'edd!_secret!_key' ) ),
 			'escaped punctuation'     => array( '/x\.y$/', array( '%x.y' ) ),
 			'escaped dollar not end'  => array( '/price\$/', array( '%price$%' ) ),
+			'escaped pipe in group'   => array( '/^(foo\|bar|baz)$/', array( 'foo|bar', 'baz' ) ),
+			'escaped pipe outside'    => array( '/^a\|b$/', array( 'a|b' ) ),
+			'escaped backslash, pipe' => array( '/^(a\\\\|b)$/', array( 'a\\', 'b' ) ),
 		);
 	}
 

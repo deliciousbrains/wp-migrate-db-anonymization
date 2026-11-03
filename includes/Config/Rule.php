@@ -287,6 +287,7 @@ class Rule {
 	 * Supported: optional `^` and `$` anchors, literal letters, digits, `_`, `-`
 	 * and escaped punctuation, and at most one group of literal alternatives,
 	 * optionally made optional with `?`, e.g. `/_wcpay_customer_id(_live|_test)?$/`.
+	 * An escaped `\|` in the group is a literal pipe, not a separator.
 	 * Any flag (e.g. `i`) or other syntax returns null, so the caller scans the table.
 	 *
 	 * @param string $regex e.g. '/_stripe_customer_id$/'
@@ -321,7 +322,7 @@ class Rule {
 		$after  = isset( $parts[4] ) ? $unescape( $parts[4] ) : '';
 		$middle = array( '' );
 		if ( isset( $parts[2] ) && '' !== $parts[2] ) {
-			$middle = array_map( $unescape, explode( '|', $parts[2] ) );
+			$middle = array_map( $unescape, self::split_alternatives( $parts[2] ) );
 			if ( ! empty( $parts[3] ) ) {
 				$middle[] = '';
 			}
@@ -339,5 +340,31 @@ class Rule {
 		}
 
 		return $patterns;
+	}
+
+	/**
+	 * Split a group's alternatives on `|`, except an escaped `\|`, which is a
+	 * literal pipe. Escapes are kept for the caller to remove.
+	 *
+	 * @param string $group e.g. 'foo\|bar|baz'
+	 *
+	 * @return array e.g. array( 'foo\|bar', 'baz' )
+	 */
+	protected static function split_alternatives( $group ) {
+		$alternatives = array( '' );
+		$current      = 0;
+		$length       = strlen( $group );
+
+		for ( $i = 0; $i < $length; $i++ ) {
+			if ( '\\' === $group[ $i ] && $i + 1 < $length ) {
+				$alternatives[ $current ] .= $group[ $i ] . $group[ ++$i ];
+			} elseif ( '|' === $group[ $i ] ) {
+				$alternatives[ ++$current ] = '';
+			} else {
+				$alternatives[ $current ] .= $group[ $i ];
+			}
+		}
+
+		return $alternatives;
 	}
 }
