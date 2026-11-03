@@ -87,3 +87,21 @@ If you need to pass arguments to the Faker data method then you can define this 
     }
     
     add_filter( 'wpmdb_anonymization_config', 'my_wpmdb_anonymization_rules' );
+
+## Development
+
+Install the development dependencies with `composer install`.
+
+### Running tests
+
+The unit tests use PHPUnit and run without a WordPress install. The small set of WordPress functions and classes the plugin uses (`apply_filters()`, `wp_hash_password()`, `WP_User`, `wpdb` and so on) are stubbed in `tests/stubs/`.
+
+    composer test
+
+To run against a specific PHP version, call PHPUnit with that binary, e.g. `/path/to/php7.4 vendor/bin/phpunit`. GitHub Actions runs the suite on PHP 7.4, 8.1, 8.2 and 8.3 for every push and pull request.
+
+### Building the plugin zip
+
+    composer build
+
+This runs `bin/build.sh`, which copies the plugin to a temporary directory, installs production dependencies only (`composer install --no-dev --optimize-autoloader`), strips everything listed in `.distignore` (tests, CI config, `.gitignore` and other development files) and writes `build/wp-migrate-db-anonymization.zip`, ready for the WordPress.org plugin repository. The script needs `bash`, `rsync`, `zip` and `composer`. Set `PHP_BIN=/path/to/php` to run Composer with a specific PHP version.

@@ -1,0 +1,31 @@
+# Files and directories excluded from the wordpress.org plugin build.
+# Used by bin/build.sh (rsync --exclude-from) and compatible with `wp dist-archive`.
+
+# Version control and CI
+/.git
+/.github
+/.gitignore
+/.gitattributes
+/.distignore
+
+# Development tooling and tests
+/bin
+/build
+/tests
+/phpunit.xml
+/phpunit.xml.dist
+/.phpunit.result.cache
+/.phpunit.cache
+/.editorconfig
+/sonar-project.properties
+/catalog-info.yaml
+
+# GitHub readme (wordpress.org uses readme.txt)
+/README.md
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.idea
+.vscode
+*.zip
