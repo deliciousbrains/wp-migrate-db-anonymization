@@ -35,6 +35,26 @@ return array(
 			),
 		),
 	),
+	'options'               => array(
+		'option_value' => array(
+			array(
+				// EDD caches each user's API public key and secret key for an hour
+				// in transients named md5( 'edd_api_user_public_key' . $user_id ) and
+				// md5( 'edd_api_user_secret_key' . $user_id ), after an API request or
+				// when the keys are shown in the admin (EDD_API::get_user_public_key()
+				// and get_user_secret_key()). Expired transients stay in the table
+				// until WordPress deletes them. The names can't be listed without the
+				// user IDs, so this matches any transient with an MD5 name and an MD5
+				// value: a different cache stored that way gets a random value too.
+				// With a secret, the replacement is the same as the key's in usermeta.
+				'constraint'     => array(
+					'option_name'  => array( 'regex' => '/^_transient_[a-f0-9]{32}$/' ),
+					'option_value' => array( 'regex' => '/^[a-f0-9]{32}$/' ),
+				),
+				'fake_data_type' => 'md5',
+			),
+		),
+	),
 	'postmeta'              => array(
 		'meta_value' => array(
 			array(

@@ -92,6 +92,7 @@ The anonymization rules live in the `config` directory, one file per plugin. Ord
     - `wc_webhooks`: secret and delivery URL
 - `credentials-easy-digital-downloads.php` (loaded with `easy-digital-downloads.php`; see [Credentials](#credentials))
     - `usermeta`: user API keys
+    - `options`: user API keys cached in transients
     - `postmeta`: EDD 2.x API log keys and tokens, EDD Software Licensing 2.x license keys
     - `posts`: query string of EDD 2.x API request logs (the excerpt of `edd_log` posts)
     - `edd_logs_api_requests`: API key, token and request query string. In both API request logs, `public`, which EDD records as the key and token of a request made without an API key, is kept
@@ -125,6 +126,8 @@ API keys, tokens and secrets aren't personal data, but they give access to the l
 Two Factor TOTP secrets and backup codes are replaced too, so users who set up two-factor authentication on the live site, including whitelisted users, need to set it up again on the copy, or deactivate the Two Factor plugin there.
 
 Easy Digital Downloads credentials are in a separate file, `credentials-easy-digital-downloads.php`, loaded only on sites with EDD data. EDD stores each user's API key as a `usermeta` meta key, so its rule is limited by `meta_value`, and loading it everywhere would make the WP-CLI command read every `usermeta` row on every site.
+
+EDD also caches each user's API keys for an hour in transients named with an MD5 hash that includes the user ID, so they can't be listed in a rule. Any transient with an MD5-style name and value is therefore given a random value of the same shape, which may include a cache another plugin stores the same way. With a [secret](#deterministic-anonymization), a cached key gets the same replacement as the key in `usermeta`. As the transient names can't be listed, the WP-CLI command reads every row of the `options` table on sites with EDD data. Sites with a persistent object cache keep transients there instead of in the database.
 
 To keep the original credentials, turn both files off:
 

@@ -496,6 +496,23 @@ class CLITest extends TestCase {
 		$this->assertStringContainsString( 'meta_value', $queries[0] );
 	}
 
+	public function test_edd_api_keys_cached_in_transients_are_replaced_in_place() {
+		$key       = str_repeat( implode( '', range( 0, 9 ) ) . 'abcdef', 2 );
+		$transient = '_transient_' . md5( 'edd_api_user_secret_key1' );
+		$this->wpdb->exec( 'CREATE TABLE wp_edd_orders ( id INTEGER PRIMARY KEY, email TEXT )' );
+		$this->wpdb->exec( 'CREATE TABLE wp_options ( option_id INTEGER PRIMARY KEY, option_name TEXT, option_value TEXT, autoload TEXT )' );
+		$this->wpdb->exec( "INSERT INTO wp_options VALUES ( 1, 'siteurl', 'https://shop.test', 'yes' ), ( 2, '{$transient}', '{$key}', 'no' ), ( 3, '_transient_timeout_" . md5( 'edd_api_user_secret_key1' ) . "', '1767225600', 'no' )" );
+
+		$this->run_command( array( 'tables' => 'options' ) );
+
+		$rows = $this->wpdb->rows( 'wp_options' );
+		$this->assertMatchesRegularExpression( '/^[a-f0-9]{32}$/', $rows['2']->option_value );
+		$this->assertNotSame( $key, $rows['2']->option_value );
+		$this->assertSame( $transient, $rows['2']->option_name );
+		$this->assertSame( 'https://shop.test', $rows['1']->option_value );
+		$this->assertSame( '1767225600', $rows['3']->option_value );
+	}
+
 	/**
 	 * @dataProvider valid_prefix_provider
 	 */

@@ -5,6 +5,7 @@ namespace WPMDB\Anonymization\Tests\Unit;
 use WPMDB\Anonymization\Anonymizer;
 use WPMDB\Anonymization\Config\Loader;
 use WPMDB\Anonymization\Config\Rule;
+use WPMDB\Anonymization\Deterministic;
 use WPMDB\Anonymization\Tests\Doubles\TablesWpdb;
 use WPMDB\Anonymization\Tests\TestCase;
 
@@ -249,6 +250,70 @@ class FormsLogsCredentialsRulesTest extends TestCase {
 			$this->assertMatchesRegularExpression( '/^[a-f0-9]{32}$/', $value );
 			$this->assertNotSame( $original, $value );
 		}
+	}
+
+	/**
+	 * @return array
+	 */
+	public static function edd_api_key_transient_provider() {
+		return array(
+			'public key' => array( 'edd_api_user_public_key' ),
+			'secret key' => array( 'edd_api_user_secret_key' ),
+		);
+	}
+
+	/**
+	 * @dataProvider edd_api_key_transient_provider
+	 */
+	public function test_edd_api_keys_cached_in_transients_are_replaced( $cache_key ) {
+		$anonymizer = $this->make_anonymizer( $this->credentials_config() );
+		$hash       = md5( $cache_key . '42' );
+		$transient  = $this->row( array( 'option_id' => '9', 'option_name' => '_transient_' . $hash, 'option_value' => self::sample_key() ) );
+
+		$value = $anonymizer->anonymize_value( 'options', 'option_value', $transient, $transient->option_value );
+		$this->assertMatchesRegularExpression( '/^[a-f0-9]{32}$/', $value );
+		$this->assertNotSame( self::sample_key(), $value );
+
+		$timeout = $this->row( array( 'option_id' => '10', 'option_name' => '_transient_timeout_' . $hash, 'option_value' => '1767225600' ) );
+		$this->assertSame( '1767225600', $anonymizer->anonymize_value( 'options', 'option_value', $timeout, $timeout->option_value ) );
+	}
+
+	/**
+	 * Options that aren't a cached EDD API key.
+	 *
+	 * @return array
+	 */
+	public static function option_kept_provider() {
+		$key = str_repeat( implode( '', range( 0, 9 ) ) . 'abcdef', 2 );
+
+		return array(
+			'user ID cached by public key' => array( '_transient_' . md5( 'edd_api_user_' . $key ), '42' ),
+			'serialized cache'             => array( '_transient_' . md5( 'other' ), 'a:1:{i:0;s:3:"foo";}' ),
+			'named transient'              => array( '_transient_edd_total_api_keys', $key ),
+			'site transient'               => array( '_site_transient_' . md5( 'other' ), $key ),
+			'option'                       => array( 'my_plugin_hash', $key ),
+		);
+	}
+
+	/**
+	 * @dataProvider option_kept_provider
+	 */
+	public function test_other_options_are_kept( $option_name, $option_value ) {
+		$anonymizer = $this->make_anonymizer( $this->credentials_config() );
+		$row        = $this->row( array( 'option_id' => '11', 'option_name' => $option_name, 'option_value' => $option_value ) );
+
+		$this->assertSame( $option_value, $anonymizer->anonymize_value( 'options', 'option_value', $row, $row->option_value ) );
+	}
+
+	public function test_edd_api_key_transient_matches_the_user_meta_key_with_a_secret() {
+		$anonymizer = new Anonymizer( $this->make_config( $this->credentials_config() ), $this->make_faker(), new Deterministic( 'unit-test-secret' ) );
+		$meta       = $this->row( array( 'umeta_id' => '3', 'user_id' => '42', 'meta_key' => self::sample_key(), 'meta_value' => 'edd_user_secret_key' ) );
+		$transient  = $this->row( array( 'option_id' => '9', 'option_name' => '_transient_' . md5( 'edd_api_user_secret_key42' ), 'option_value' => self::sample_key() ) );
+
+		$this->assertSame(
+			$anonymizer->anonymize_value( 'usermeta', 'meta_key', $meta, $meta->meta_key ),
+			$anonymizer->anonymize_value( 'options', 'option_value', $transient, $transient->option_value )
+		);
 	}
 
 	public function test_edd_2_api_request_log_query_string_is_replaced() {
