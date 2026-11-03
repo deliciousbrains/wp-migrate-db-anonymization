@@ -7,6 +7,9 @@ Author: Delicious Brains
 Version: 0.3.4
 Author URI: https://deliciousbrains.com
 Network: True
+Requires at least: 5.9
+Requires PHP: 7.4
+Text Domain: wp-migrate-db-anonymization
 */
 
 // Copyright (c) 2018 Delicious Brains. All rights reserved.
@@ -25,19 +28,26 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-// Bootstrap our autoloader
-require_once dirname( __FILE__ ) . '/vendor/autoload.php';
+// Bootstrap our autoloader. On PHP older than the minimum (7.4, as in
+// WPMDB_Anonymization_Compatibility), or if the vendor directory is missing,
+// load the compatibility checker on its own so it can report the problem:
+// the dependencies use syntax that older PHP versions can't parse.
+if ( version_compare( PHP_VERSION, '7.4', '>=' ) && file_exists( __DIR__ . '/vendor/autoload.php' ) ) {
+	require_once __DIR__ . '/vendor/autoload.php';
+} else {
+	require_once __DIR__ . '/includes/Compatibility.php';
+}
 
 /**
- * The main function responsible for returning the one true Mergebot
+ * The main function responsible for returning the one true plugin
  * instance to functions everywhere.
+ *
+ * @return \WPMDB\Anonymization\Plugin
  */
 function wpmdb_anonymize() {
-	// Namespaced class name as variable so it can be parsed in < PHP 5.3
-	$class   = 'WPMDB\\Anonymization\\Plugin';
 	$version = '0.3.4';
 
-	return call_user_func( array( $class, 'get_instance' ), __FILE__, $version );
+	return \WPMDB\Anonymization\Plugin::get_instance( __FILE__, $version );
 }
 
 /**
