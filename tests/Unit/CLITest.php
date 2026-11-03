@@ -354,6 +354,38 @@ class CLITest extends TestCase {
 		$this->assertSame( array( 'wp_users' ), $this->summary_tables() );
 	}
 
+	public function test_rules_on_the_primary_key_are_skipped() {
+		$this->create_backup_table( 'my_backup_table', 5 );
+		$file = $this->write_rules_file( "array( 'my_backup_table' => array( 'id' => array( 'fake_data_type' => 'randomNumber' ), 'email' => array( 'fake_data_type' => 'email' ) ) )" );
+
+		$this->run_command( array( 'prefix' => '', 'rules' => $file, 'tables' => 'my_backup_table', 'batch-size' => 2 ) );
+
+		$warnings = array_values( array_filter( $this->messages( 'warning' ), function ( $message ) {
+			return false !== strpos( $message, 'primary key' );
+		} ) );
+		$this->assertSame( array( 'Not anonymizing my_backup_table.id: it is the primary key, and changing it while rows are read in key order would skip or repeat rows. Empty the table instead if its keys are personal data.' ), $warnings, 'Warned once for the table.' );
+
+		$this->assertSame( 5, \WP_CLI::$items[0]['scanned'] );
+		$this->assertSame( 5, \WP_CLI::$items[0]['changed'] );
+		$rows = $this->wpdb->rows( 'my_backup_table' );
+		$this->assertSame( array( '1', '2', '3', '4', '5' ), array_map( 'strval', array_keys( $rows ) ) );
+		foreach ( $rows as $row ) {
+			$this->assertMatchesPattern( self::EMAIL_PATTERN, $row->email );
+		}
+	}
+
+	public function test_table_with_only_a_primary_key_rule_is_skipped() {
+		$this->create_backup_table( 'my_backup_table', 3 );
+		$before = $this->wpdb->rows( 'my_backup_table' );
+		$file   = $this->write_rules_file( "array( 'my_backup_table' => array( 'id' => array( 'fake_data_type' => 'randomNumber' ) ) )" );
+
+		$this->run_command( array( 'prefix' => '', 'rules' => $file, 'tables' => 'my_backup_table' ) );
+
+		$this->assertSame( 0, \WP_CLI::$items[0]['scanned'] );
+		$this->assertEquals( $before, $this->wpdb->rows( 'my_backup_table' ) );
+		$this->assertContains( 'Anonymized 0 row(s).', $this->messages( 'success' ) );
+	}
+
 	/**
 	 * @dataProvider valid_prefix_provider
 	 */

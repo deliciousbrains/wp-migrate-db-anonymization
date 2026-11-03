@@ -263,6 +263,16 @@ class CLI {
 			return $summary;
 		}
 
+		// Rows are read in primary key order from the last key seen, so a changed key would move rows in or out of the remaining batches.
+		if ( in_array( $primary_key, $columns, true ) ) {
+			WP_CLI::warning( sprintf( 'Not anonymizing %1$s.%2$s: it is the primary key, and changing it while rows are read in key order would skip or repeat rows. Empty the table instead if its keys are personal data.', $table, $primary_key ) );
+
+			$columns = array_values( array_diff( $columns, array( $primary_key ) ) );
+			if ( empty( $columns ) ) {
+				return $summary;
+			}
+		}
+
 		$quoted_table = $this->quote_identifier( $table );
 		$quoted_pk    = $this->quote_identifier( $primary_key );
 		$pk_format    = preg_match( '/int/i', $table_columns[ $primary_key ] ) ? '%d' : '%s';

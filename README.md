@@ -172,6 +172,7 @@ Example output:
 How it works:
 
 - Rows are read in batches ordered by primary key and changed values are written back row by row. Tables without a single-column primary key are skipped with a warning.
+- Rules on a table's primary-key column are skipped with a warning: rows are read in key order, so changing the keys would skip or repeat rows. If the keys themselves are personal data, empty such tables instead.
 - When every rule for a table is limited to specific values of a column, as with the `meta_key` rules for `usermeta` and `postmeta`, only those rows are read (`WHERE meta_key IN (...)`) instead of the whole table.
 - A simple regex constraint, such as a meta key suffix, is read with `LIKE` patterns instead. A constraint on several columns is pushed down by one of them, the first with exact values or a list, otherwise the first simple regex; the other columns are still checked on each row.
 - The user whitelist constant and filter are respected, and empty values are left empty.
