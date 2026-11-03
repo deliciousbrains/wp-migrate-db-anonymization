@@ -188,8 +188,12 @@ return array(
 				array(
 					// Coupon email restrictions, a serialized array of customer email
 					// addresses. Replaced with a single fake address so the coupon stays
-					// restricted.
-					'constraint'            => array( 'meta_key' => 'customer_email' ),
+					// restricted. Unrestricted coupons store an empty list (a:0:{}),
+					// which is left alone so they stay unrestricted.
+					'constraint'            => array(
+						'meta_key'   => 'customer_email',
+						'meta_value' => array( 'regex' => '/^a:[1-9]/' ),
+					),
 					'fake_data_type'        => 'email',
 					'post_process_function' => 'WPMDB\\Anonymization\\Config\\Replacement::serialized_list',
 				),
