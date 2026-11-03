@@ -13,7 +13,9 @@
  * `wpmdb_anonymization_load_config_file` filter (see the README).
  */
 
-$edd_api_key_names = array( 'edd_user_public_key', 'edd_user_secret_key' );
+// The usermeta names EDD gives a user's API keys: the meta key before EDD 2.4,
+// the meta value from 2.4.
+$edd_api_user_meta_names = array( 'edd_user_public_key', 'edd_user_secret_key' );
 
 return array(
 	'usermeta'              => array(
@@ -21,7 +23,7 @@ return array(
 			array(
 				// API keys stored by EDD before 2.4, with the key as the value (see
 				// meta_key below for later versions).
-				'constraint'     => array( 'meta_key' => array( 'in' => $edd_api_key_names ) ),
+				'constraint'     => array( 'meta_key' => array( 'in' => $edd_api_user_meta_names ) ),
 				'fake_data_type' => 'md5',
 			),
 		),
@@ -30,7 +32,7 @@ return array(
 				// EDD 2.4+ stores a user's API public key and secret key as the meta
 				// key, with 'edd_user_public_key' or 'edd_user_secret_key' as the
 				// value. Both keys are MD5 hashes.
-				'constraint'     => array( 'meta_value' => array( 'in' => $edd_api_key_names ) ),
+				'constraint'     => array( 'meta_value' => array( 'in' => $edd_api_user_meta_names ) ),
 				'fake_data_type' => 'md5',
 			),
 		),

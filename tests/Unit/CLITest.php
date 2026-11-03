@@ -498,10 +498,13 @@ class CLITest extends TestCase {
 
 	public function test_edd_api_keys_cached_in_transients_are_replaced_in_place() {
 		$key       = str_repeat( implode( '', range( 0, 9 ) ) . 'abcdef', 2 );
-		$transient = '_transient_' . md5( 'edd_api_user_secret_key1' );
+		$user_id   = 1;
+		// Named as EDD_API::get_user_secret_key() names the transient.
+		$cache_id  = md5( 'edd_api_user_secret_key' . $user_id );
+		$transient = '_transient_' . $cache_id;
 		$this->wpdb->exec( 'CREATE TABLE wp_edd_orders ( id INTEGER PRIMARY KEY, email TEXT )' );
 		$this->wpdb->exec( 'CREATE TABLE wp_options ( option_id INTEGER PRIMARY KEY, option_name TEXT, option_value TEXT, autoload TEXT )' );
-		$this->wpdb->exec( "INSERT INTO wp_options VALUES ( 1, 'siteurl', 'https://shop.test', 'yes' ), ( 2, '{$transient}', '{$key}', 'no' ), ( 3, '_transient_timeout_" . md5( 'edd_api_user_secret_key1' ) . "', '1767225600', 'no' )" );
+		$this->wpdb->exec( "INSERT INTO wp_options VALUES ( 1, 'siteurl', 'https://shop.test', 'yes' ), ( 2, '{$transient}', '{$key}', 'no' ), ( 3, '_transient_timeout_{$cache_id}', '1767225600', 'no' )" );
 
 		$this->run_command( array( 'tables' => 'options' ) );
 

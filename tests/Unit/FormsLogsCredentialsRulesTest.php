@@ -324,7 +324,7 @@ class FormsLogsCredentialsRulesTest extends TestCase {
 	public function test_edd_api_key_transient_matches_the_user_meta_key_with_a_secret() {
 		$anonymizer = new Anonymizer( $this->make_config( $this->credentials_config() ), $this->make_faker(), new Deterministic( 'unit-test-secret' ) );
 		$meta       = $this->row( array( 'umeta_id' => '3', 'user_id' => '42', 'meta_key' => self::sample_key(), 'meta_value' => 'edd_user_secret_key' ) );
-		$transient  = $this->row( array( 'option_id' => '9', 'option_name' => '_transient_' . md5( 'edd_api_user_secret_key42' ), 'option_value' => self::sample_key() ) );
+		$transient  = $this->row( array( 'option_id' => '9', 'option_name' => '_transient_' . md5( 'edd_api_user_secret_key' . $meta->user_id ), 'option_value' => self::sample_key() ) );
 
 		$this->assertSame(
 			$anonymizer->anonymize_value( 'usermeta', 'meta_key', $meta, $meta->meta_key ),
@@ -423,7 +423,7 @@ class FormsLogsCredentialsRulesTest extends TestCase {
 			array(
 				'webhook_id'   => '1',
 				'status'       => 'active',
-				'delivery_url' => 'https://hooks.example.org/services/T000/B000/abc123',
+				'delivery_url' => 'https://hooks.example.org/woocommerce/order-created',
 			)
 		);
 
