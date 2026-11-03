@@ -16,9 +16,15 @@ namespace WPMDB\Anonymization;
  * names) also get a fragment of that HMAC embedded, so two different originals
  * can't produce the same fake value.
  *
+ * Hash-shaped values (md5, sha1, sha256 and uuid), such as licence keys and
+ * tokens, are not taken from Faker: its output depends on a seed of only 28
+ * bits, so distinct originals could get the same fake. They are built
+ * directly from a second keyed hash of the original instead.
+ *
  * Without a secret, the same uniqueness-sensitive types get a random fragment
- * in the same format instead (see generate_random_unique()), so fake email
- * addresses and user names don't collide in random mode either.
+ * in the same format instead (see generate_random_unique()), and hash-shaped
+ * values are built from random_bytes(), so fake values don't collide in
+ * random mode either.
  */
 class Deterministic {
 
@@ -57,6 +63,20 @@ class Deterministic {
 	 * @var array
 	 */
 	protected $username_types = array( 'userName' );
+
+	/**
+	 * Faker formatters that produce hash-shaped values, mapped to their length
+	 * in hex characters. They are built from a keyed hash or random bytes
+	 * rather than Faker, so they don't collide.
+	 *
+	 * @var array
+	 */
+	protected $hash_types = array(
+		'md5'    => 32,
+		'sha1'   => 40,
+		'sha256' => 64,
+		'uuid'   => 32,
+	);
 
 	/**
 	 * Faker formatters that are never generated deterministically.
@@ -145,6 +165,10 @@ class Deterministic {
 	 * @return mixed
 	 */
 	public function generate( $faker, $fake_data_type, array $args, $original ) {
+		if ( $this->is_hash_type( $fake_data_type ) ) {
+			return $this->hash_value( $fake_data_type, $this->value_hash( $fake_data_type, $args, $original ) );
+		}
+
 		$hash = $this->hash( $fake_data_type, $args, $original );
 
 		$faker->seed( $this->seed_from_hash( $hash ) );
@@ -166,7 +190,8 @@ class Deterministic {
 
 	/**
 	 * Generate a random but unique value for a uniqueness-sensitive type
-	 * (email addresses and user names) when no secret is configured.
+	 * (email addresses, user names, domain names, URLs and hash-shaped
+	 * values) when no secret is configured.
 	 *
 	 * Faker's own output repeats on large data sets, which breaks unique
 	 * columns (for example a plugin table with a UNIQUE email column). WP
@@ -174,6 +199,8 @@ class Deterministic {
 	 * modifier can't help. Instead a random fragment from random_bytes() is
 	 * embedded, in the same format as deterministic mode, so collisions are
 	 * as unlikely as there and the output looks the same in both modes.
+	 * Hash-shaped values are built entirely from random_bytes(), as Faker's
+	 * come from mt_rand() and repeat on large tables.
 	 *
 	 * @param \Faker\Generator $faker
 	 * @param string           $fake_data_type
@@ -181,6 +208,10 @@ class Deterministic {
 	 * @return string
 	 */
 	public function generate_random_unique( $faker, $fake_data_type ) {
+		if ( $this->is_hash_type( $fake_data_type ) ) {
+			return $this->hash_value( $fake_data_type, random_bytes( 32 ) );
+		}
+
 		$fragment = bin2hex( random_bytes( (int) ( self::FRAGMENT_LENGTH / 2 ) ) );
 		$base     = $this->is_domain_type( $fake_data_type ) ? $faker->domainWord() : $faker->userName();
 
@@ -189,15 +220,27 @@ class Deterministic {
 
 	/**
 	 * Is this a type whose fake values must not collide (email addresses, user
-	 * names, domain names and URLs)? Domains and URLs are often unique too,
-	 * e.g. EDD Software Licensing's UNIQUE (site_name, license_id).
+	 * names, domain names, URLs and hash-shaped values)? Domains and URLs are
+	 * often unique too, e.g. EDD Software Licensing's UNIQUE (site_name,
+	 * license_id), as are licence keys and tokens.
 	 *
 	 * @param string $fake_data_type
 	 *
 	 * @return bool
 	 */
 	public function is_unique_type( $fake_data_type ) {
-		return $this->is_email_type( $fake_data_type ) || $this->is_username_type( $fake_data_type ) || $this->is_domain_type( $fake_data_type );
+		return $this->is_email_type( $fake_data_type ) || $this->is_username_type( $fake_data_type ) || $this->is_domain_type( $fake_data_type ) || $this->is_hash_type( $fake_data_type );
+	}
+
+	/**
+	 * Is this a hash-shaped type (md5, sha1, sha256 or uuid)?
+	 *
+	 * @param string $fake_data_type
+	 *
+	 * @return bool
+	 */
+	public function is_hash_type( $fake_data_type ) {
+		return is_string( $fake_data_type ) && isset( $this->hash_types[ $fake_data_type ] );
 	}
 
 	/**
@@ -229,6 +272,52 @@ class Deterministic {
 		);
 
 		return hash_hmac( 'sha256', $message, $this->secret );
+	}
+
+	/**
+	 * Raw HMAC-SHA256 used to build a hash-shaped value. A second keyed hash,
+	 * labelled differently from hash(), so the value shares no bits with the
+	 * seed or fragment derived from hash().
+	 *
+	 * @param string $fake_data_type
+	 * @param array  $args
+	 * @param mixed  $original
+	 *
+	 * @return string 32 raw bytes.
+	 */
+	public function value_hash( $fake_data_type, array $args, $original ) {
+		$message = implode(
+			"\x1f",
+			array(
+				self::VERSION,
+				'value',
+				$this->type_key( $fake_data_type, $args ),
+				$this->normalise( $fake_data_type, $original ),
+			)
+		);
+
+		return hash_hmac( 'sha256', $message, $this->secret, true );
+	}
+
+	/**
+	 * Format 32 bytes (a keyed hash or random bytes) as a hash-shaped value:
+	 * lower-case hex of the type's length, or an RFC 4122 version 4 UUID.
+	 *
+	 * @param string $fake_data_type md5, sha1, sha256 or uuid.
+	 * @param string $bytes          At least 32 raw bytes.
+	 *
+	 * @return string
+	 */
+	protected function hash_value( $fake_data_type, $bytes ) {
+		if ( 'uuid' !== $fake_data_type ) {
+			return substr( bin2hex( $bytes ), 0, $this->hash_types[ $fake_data_type ] );
+		}
+
+		$bytes    = substr( $bytes, 0, 16 );
+		$bytes[6] = chr( ( ord( $bytes[6] ) & 0x0f ) | 0x40 ); // Version 4.
+		$bytes[8] = chr( ( ord( $bytes[8] ) & 0x3f ) | 0x80 ); // RFC 4122 variant.
+
+		return vsprintf( '%s%s-%s-%s-%s-%s%s%s', str_split( bin2hex( $bytes ), 4 ) );
 	}
 
 	/**
