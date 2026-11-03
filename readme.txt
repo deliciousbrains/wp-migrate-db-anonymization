@@ -61,7 +61,7 @@ Set a secret with the `WPMDB_ANONYMIZATION_SECRET` constant, the `wpmdb_anonymiz
 * Improvement: Anonymize pending email changes and signup IP addresses in user meta; WooCommerce order attribution user agents, VAT numbers, PayPal Express and Stripe card IDs, PayPal token emails, coupon email restrictions and back in stock sign-ups; Easy Digital Downloads customer and subscription notes, license activation sites, EDD Invoices details, PayPal Express payer IDs and EDD 2.x addresses and log IP addresses
 * New: `wp migrate-anonymize run` WP-CLI command to anonymize a database in place, without WP Migrate
 * New: `--rules` and `--prefix` options for `wp migrate-anonymize run`, and a `wpmdb_anonymization_config_files` filter, to anonymize with private rule files and tables under another prefix or none
-* New: Deterministic anonymization with a secret, keeping fake values consistent and unique across tables; fake email addresses, user names, domain names and URLs are also unique without a secret (#29)
+* New: Deterministic anonymization with a secret, keeping fake values consistent and unique across tables; fake email addresses, user names, domain names, URLs and hash-shaped values (md5, sha1, sha256, uuid) are also unique without a secret (#29)
 
 = 0.3.4 - 2019-05-21 =
 

@@ -171,14 +171,15 @@ Example output:
 
 How it works:
 
-- Rows are read in batches ordered by primary key and changed values are written back row by row. Tables without a single-column primary key are skipped with a warning.
+- Rows are read in batches ordered by primary key and changed values are written back row by row, one transaction per batch. Tables without a single-column primary key are skipped with a warning.
 - Rules on a table's primary-key column are skipped with a warning: rows are read in key order, so changing the keys would skip or repeat rows. If the keys themselves are personal data, empty such tables instead.
 - When every rule for a table is limited to specific values of a column, as with the `meta_key` rules for `usermeta` and `postmeta`, only those rows are read (`WHERE meta_key IN (...)`) instead of the whole table.
-- A simple regex constraint, such as a meta key suffix, is read with `LIKE` patterns instead. A constraint on several columns is pushed down by one of them, the first with exact values or a list, otherwise the first simple regex; the other columns are still checked on each row.
+- A simple regex constraint, such as a meta key suffix, is read with `LIKE` patterns instead. A regex ending in `$` also matches a value ending in a newline, as it does in PHP, so those rows are read too. A constraint on several columns is pushed down by one of them, the first with exact values or a list, otherwise the first simple regex; the other columns are still checked on each row.
 - The user whitelist constant and filter are respected, and empty values are left empty.
 - On multisite, `users` and `usermeta` are processed once and the other tables are processed for every site, unless `--prefix` is given.
 - The object cache is flushed afterwards.
-- If any row can't be updated, or a query to read a table fails, the command still prints the summary, then exits with an error (non-zero status) saying the database is not fully anonymized. A failed read stops that table and is counted in `errors`; the other tables are still processed. A dry run with a failed read also exits with an error.
+- If any row can't be updated, or a query to read a table fails, the command still prints the summary, then exits with an error (non-zero status) saying the database is not fully anonymized. A failed read stops that table and is counted in `errors`; the other tables are still processed. If a batch can't be committed, it is rolled back and its rows are counted in `errors`, not `changed`. A dry run with a failed read also exits with an error.
+- If checking whether a table exists fails, the command stops with an error before changing anything.
 
 Run it once per database. Running it again anonymizes the already fake values, which then no longer match values anonymized from the original data.
 
@@ -186,7 +187,7 @@ Run it once per database. Running it again anonymizes the already fake values, w
 
 By default every fake value is random, so the same email address becomes a different fake address in each table and row. That breaks joins and distinct counts on the anonymized data.
 
-Fake email addresses, user names, domain names and URLs are unique in both modes, so columns with a unique index, such as a newsletter plugin's subscriber email or EDD Software Licensing's activation sites, don't break on large databases. Email addresses and user names look like `kshlerin.rosalind.3f9a0c1b2d4e@example.com`: a Faker user name, a 12-character hex fragment and, for email addresses, the reserved `example.com` domain. Domain names and URLs are subdomains of `example.com`, e.g. `schaden-3f9a0c1b2d4e.example.com` and `https://schaden-3f9a0c1b2d4e.example.com/`, so they never point at a real site. Without a secret the fragment is random (from `random_bytes()`); with one it comes from the HMAC described below. Other values, such as names and cities, are not made unique and can repeat in random mode, just as they do in real data.
+Fake email addresses, user names, domain names and URLs are unique in both modes, so columns with a unique index, such as a newsletter plugin's subscriber email or EDD Software Licensing's activation sites, don't break on large databases. Email addresses and user names look like `kshlerin.rosalind.3f9a0c1b2d4e@example.com`: a Faker user name, a 12-character hex fragment and, for email addresses, the reserved `example.com` domain. Domain names and URLs are subdomains of `example.com`, e.g. `schaden-3f9a0c1b2d4e.example.com` and `https://schaden-3f9a0c1b2d4e.example.com/`, so they never point at a real site. Without a secret the fragment is random (from `random_bytes()`); with one it comes from the HMAC described below. Hash-shaped values from the `md5`, `sha1`, `sha256` and `uuid` formatters, such as licence keys and tokens, are unique too: they are built from `random_bytes()` without a secret, or from a keyed hash of the original value with one, rather than by Faker. Other values, such as names and cities, are not made unique and can repeat in random mode, just as they do in real data.
 
 Configure a secret to make anonymization deterministic, in wp-config.php:
 
@@ -203,11 +204,12 @@ With a secret, each fake value is generated by seeding Faker from an HMAC-SHA256
 - The same original value always becomes the same fake value, in every table, row and run that uses the same secret. For example, a customer's email address in `users.user_email`, the `billing_email` user meta and the `_billing_email` order meta all become the same fake address, so joins and `COUNT(DISTINCT ...)` give the same answers as on the original data.
 - Email addresses, user names and domain names are trimmed and lower-cased first, so `Alice@Example.org` and `alice@example.org` map to the same fake value. Other values are only trimmed.
 - Fake email addresses, user names, domain names and URLs include a 12-character fragment of the HMAC so different originals don't collide, e.g. `kshlerin.rosalind.3f9a0c1b2d4e@example.com`. Fake email addresses always use the reserved `example.com` domain.
+- Fake `md5`, `sha1`, `sha256` and `uuid` values are taken directly from a second HMAC-SHA256 of the original value rather than from Faker, so different originals don't collide and the same licence key gets the same fake key in every table, such as EDD's licences table and the `_edd_sl_key` post meta.
 - Empty values stay empty. Passwords are never deterministic.
 
 **Keep the secret private.** Use a long random value, don't commit it to version control and don't share it with the anonymized database. Anyone who has the secret can test guesses: they can anonymize a candidate value, such as a known email address, and check whether the result appears in the data. Without the secret, the fake values can't be linked back to the originals.
 
-The fake values come from Faker, so upgrading Faker or changing its locale can change the readable part of a value (the hash fragment in email addresses, user names, domain names and URLs stays the same). To join or compare datasets, anonymize them with the same secret and plugin version. Faker formatters that are relative to the current date, such as `dateTimeThisYear`, will also change over time.
+The fake values come from Faker, so upgrading Faker or changing its locale can change the readable part of a value (the hash fragment in email addresses, user names, domain names and URLs, and hash-shaped values, stay the same). To join or compare datasets, anonymize them with the same secret and plugin version. Faker formatters that are relative to the current date, such as `dateTimeThisYear`, will also change over time.
 
 ## Extending
 
