@@ -290,6 +290,9 @@ class Rule {
 	 * An escaped `\|` in the group is a literal pipe, not a separator.
 	 * Any flag (e.g. `i`) or other syntax returns null, so the caller scans the table.
 	 *
+	 * As `$` also matches before a final newline (there is no `D` modifier), an
+	 * end-anchored regex gives each pattern twice: as is and with a trailing "\n".
+	 *
 	 * @param string $regex e.g. '/_stripe_customer_id$/'
 	 *
 	 * @return array|null LIKE patterns, with `!`, `%` and `_` escaped by `!` (use `ESCAPE '!'`).
@@ -337,6 +340,10 @@ class Rule {
 			// `!` is the LIKE escape character: it means the same in MySQL and SQLite.
 			$escaped    = str_replace( array( '!', '%', '_' ), array( '!!', '!%', '!_' ), $text );
 			$patterns[] = ( $start ? '' : '%' ) . $escaped . ( $end ? '' : '%' );
+			if ( $end ) {
+				// Without the D modifier, PCRE's `$` also matches before a final newline.
+				$patterns[] = ( $start ? '' : '%' ) . $escaped . "\n";
+			}
 		}
 
 		return $patterns;

@@ -16,17 +16,17 @@ class RuleLikePatternsTest extends TestCase {
 
 	public function convertible_provider() {
 		return array(
-			'suffix'                  => array( '/_stripe_customer_id$/', array( '%!_stripe!_customer!_id' ) ),
+			'suffix'                  => array( '/_stripe_customer_id$/', array( '%!_stripe!_customer!_id', "%!_stripe!_customer!_id\n" ) ),
 			'prefix'                  => array( '/^billing_/', array( 'billing!_%' ) ),
-			'exact'                   => array( '/^tel-1$/', array( 'tel-1' ) ),
+			'exact'                   => array( '/^tel-1$/', array( 'tel-1', "tel-1\n" ) ),
 			'contains'                => array( '/vat/', array( '%vat%' ) ),
-			'optional alternatives'   => array( '/_wcpay_customer_id(_live|_test)?$/', array( '%!_wcpay!_customer!_id!_live', '%!_wcpay!_customer!_id!_test', '%!_wcpay!_customer!_id' ) ),
-			'required alternatives'   => array( '/^edd_(public|secret)_key$/', array( 'edd!_public!_key', 'edd!_secret!_key' ) ),
-			'escaped punctuation'     => array( '/x\.y$/', array( '%x.y' ) ),
+			'optional alternatives'   => array( '/_wcpay_customer_id(_live|_test)?$/', array( '%!_wcpay!_customer!_id!_live', "%!_wcpay!_customer!_id!_live\n", '%!_wcpay!_customer!_id!_test', "%!_wcpay!_customer!_id!_test\n", '%!_wcpay!_customer!_id', "%!_wcpay!_customer!_id\n" ) ),
+			'required alternatives'   => array( '/^edd_(public|secret)_key$/', array( 'edd!_public!_key', "edd!_public!_key\n", 'edd!_secret!_key', "edd!_secret!_key\n" ) ),
+			'escaped punctuation'     => array( '/x\.y$/', array( '%x.y', "%x.y\n" ) ),
 			'escaped dollar not end'  => array( '/price\$/', array( '%price$%' ) ),
-			'escaped pipe in group'   => array( '/^(foo\|bar|baz)$/', array( 'foo|bar', 'baz' ) ),
-			'escaped pipe outside'    => array( '/^a\|b$/', array( 'a|b' ) ),
-			'escaped backslash, pipe' => array( '/^(a\\\\|b)$/', array( 'a\\', 'b' ) ),
+			'escaped pipe in group'   => array( '/^(foo\|bar|baz)$/', array( 'foo|bar', "foo|bar\n", 'baz', "baz\n" ) ),
+			'escaped pipe outside'    => array( '/^a\|b$/', array( 'a|b', "a|b\n" ) ),
+			'escaped backslash, pipe' => array( '/^(a\\\\|b)$/', array( 'a\\', "a\\\n", 'b', "b\n" ) ),
 		);
 	}
 
@@ -54,7 +54,7 @@ class RuleLikePatternsTest extends TestCase {
 	public function test_rule_returns_patterns_only_for_regex_only_constraints() {
 		$rule = new Rule( 'usermeta', 'meta_value' );
 		$rule->load( array( 'constraint' => array( 'meta_key' => array( 'regex' => '/_stripe_customer_id$/' ) ), 'fake_data_type' => 'ean13' ) );
-		$this->assertSame( array( 'meta_key', array( '%!_stripe!_customer!_id' ) ), $rule->get_constraint_like_patterns() );
+		$this->assertSame( array( 'meta_key', array( '%!_stripe!_customer!_id', "%!_stripe!_customer!_id\n" ) ), $rule->get_constraint_like_patterns() );
 
 		// A list with a regex is already pushed down as the list.
 		$rule = new Rule( 'usermeta', 'meta_value' );
@@ -70,11 +70,11 @@ class RuleLikePatternsTest extends TestCase {
 		// The first regex can't be converted, the second can.
 		$rule = new Rule( 'postmeta', 'meta_value' );
 		$rule->load( array( 'constraint' => array( 'meta_value' => array( 'regex' => '/^(?!public$)/' ), 'meta_key' => array( 'regex' => '/^_edd_log_(key|token)$/' ) ), 'fake_data_type' => 'md5' ) );
-		$this->assertSame( array( 'meta_key', array( '!_edd!_log!_key', '!_edd!_log!_token' ) ), $rule->get_constraint_like_patterns() );
+		$this->assertSame( array( 'meta_key', array( '!_edd!_log!_key', "!_edd!_log!_key\n", '!_edd!_log!_token', "!_edd!_log!_token\n" ) ), $rule->get_constraint_like_patterns() );
 
 		$rule = new Rule( 'postmeta', 'meta_value' );
 		$rule->load( array( 'constraint' => array( 'meta_key' => array( 'regex' => '/_stripe_customer_id$/' ), 'meta_value' => array( 'regex' => '/^cus_/' ) ), 'fake_data_type' => 'ean13' ) );
-		$this->assertSame( array( 'meta_key', array( '%!_stripe!_customer!_id' ) ), $rule->get_constraint_like_patterns() );
+		$this->assertSame( array( 'meta_key', array( '%!_stripe!_customer!_id', "%!_stripe!_customer!_id\n" ) ), $rule->get_constraint_like_patterns() );
 
 		// Another column has exact values, which get_constraint_values() pushes down instead.
 		$rule = new Rule( 'postmeta', 'meta_value' );

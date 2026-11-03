@@ -159,6 +159,27 @@ class CLITest extends TestCase {
 		$this->assertSame( 'en_GB', $rows['4']->meta_value );
 	}
 
+	public function test_like_push_down_keeps_values_ending_in_a_newline_that_the_regex_matches() {
+		$this->wpdb->exec( 'CREATE TABLE "site_meta" ( meta_id INTEGER PRIMARY KEY, meta_key TEXT, meta_value TEXT )' );
+		// PCRE's `$` matches before a final newline, so the rule applies to row 2 too.
+		$this->wpdb->exec( "INSERT INTO \"site_meta\" VALUES ( 1, 'wp__stripe_customer_id', 'cus_real1' ), ( 2, 'wp__stripe_customer_id' || char(10), 'cus_real2' ), ( 3, 'wp__stripe_customer_id' || char(10) || 'x', 'keep-me' ), ( 4, 'locale', 'en_GB' )" );
+
+		$file = $this->write_rules_file( "array( 'site_meta' => array( 'meta_value' => array( array( 'constraint' => array( 'meta_key' => array( 'regex' => '/_stripe_customer_id\$/' ) ), 'fake_data_type' => 'ean13' ) ) ) )" );
+
+		$this->run_command( array( 'prefix' => '', 'rules' => $file, 'tables' => 'site_meta' ) );
+
+		$this->assertSame( array( 'site_meta' ), $this->summary_tables() );
+		$this->assertSame( 2, (int) \WP_CLI::$items[0]['scanned'] );
+		$this->assertSame( 2, (int) \WP_CLI::$items[0]['changed'] );
+
+		$rows = $this->wpdb->rows( 'site_meta' );
+		$this->assertSame( "wp__stripe_customer_id\n", $rows['2']->meta_key );
+		$this->assertNotSame( 'cus_real1', $rows['1']->meta_value );
+		$this->assertNotSame( 'cus_real2', $rows['2']->meta_value, 'A meta key ending in a newline is still fetched and anonymized.' );
+		$this->assertSame( 'keep-me', $rows['3']->meta_value );
+		$this->assertSame( 'en_GB', $rows['4']->meta_value );
+	}
+
 	public function test_multi_column_constraint_pushes_one_column_into_sql_and_checks_the_other_per_row() {
 		$this->wpdb->exec( 'CREATE TABLE "site_meta" ( meta_id INTEGER PRIMARY KEY, meta_key TEXT, meta_value TEXT )' );
 		$this->wpdb->exec( "INSERT INTO \"site_meta\" VALUES ( 1, 'customer_email', 'alice@real.test' ), ( 2, 'customer_email', 'n/a' ), ( 3, 'other_email', 'bob@real.test' ), ( 4, 'locale', 'en_GB' ), ( 5, 'customer_email', 'carol@real.test' )" );
