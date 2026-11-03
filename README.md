@@ -177,6 +177,7 @@ How it works:
 - The user whitelist constant and filter are respected, and empty values are left empty.
 - On multisite, `users` and `usermeta` are processed once and the other tables are processed for every site, unless `--prefix` is given.
 - The object cache is flushed afterwards.
+- If any row can't be updated, or a query to read a table fails, the command still prints the summary, then exits with an error (non-zero status) saying the database is not fully anonymized. A failed read stops that table and is counted in `errors`; the other tables are still processed. A dry run with a failed read also exits with an error.
 
 Run it once per database. Running it again anonymizes the already fake values, which then no longer match values anonymized from the original data.
 

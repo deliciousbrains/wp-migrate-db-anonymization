@@ -75,6 +75,14 @@ class SqliteWpdb extends \wpdb {
 	public $queries = array();
 
 	/**
+	 * Regular expressions: a statement matching one fails as if the database
+	 * returned an error, with last_error set.
+	 *
+	 * @var array
+	 */
+	public $fail_queries = array();
+
+	/**
 	 * @var \PDO
 	 */
 	protected $pdo;
@@ -167,6 +175,10 @@ class SqliteWpdb extends \wpdb {
 	 * @return array List of row objects.
 	 */
 	public function get_results( $sql ) {
+		if ( $this->simulate_failure( $sql ) ) {
+			return array();
+		}
+
 		if ( preg_match( '/^SHOW COLUMNS FROM `((?:[^`]|``)+)`$/', $sql, $matches ) ) {
 			$columns = array();
 			foreach ( $this->table_info( $matches[1] ) as $column ) {
@@ -257,6 +269,10 @@ class SqliteWpdb extends \wpdb {
 		$sql             = 'UPDATE ' . $this->quote( $table ) . ' SET ' . implode( ', ', $set ) . ' WHERE ' . implode( ' AND ', $conditions );
 		$this->queries[] = $sql;
 
+		if ( $this->simulate_failure( $sql, $values ) ) {
+			return false;
+		}
+
 		$statement = $this->pdo->prepare( $sql );
 		if ( ! $statement || ! $statement->execute( $values ) ) {
 			$this->last_error = $statement ? implode( ' ', $statement->errorInfo() ) : implode( ' ', $this->pdo->errorInfo() );
@@ -298,12 +314,41 @@ class SqliteWpdb extends \wpdb {
 
 		$this->queries[] = $sql;
 
+		if ( $this->simulate_failure( $sql ) ) {
+			return false;
+		}
+
 		$statement = $this->pdo->query( $sql );
 		if ( false === $statement ) {
 			$this->last_error = implode( ' ', $this->pdo->errorInfo() );
 		}
 
 		return $statement;
+	}
+
+	/**
+	 * Clear last_error, as wpdb does before each query, and fail the statement
+	 * if it matches one of $fail_queries. For an UPDATE, the values are
+	 * appended to the statement it is matched against.
+	 *
+	 * @param string $sql
+	 * @param array  $values
+	 *
+	 * @return bool Whether the statement should fail.
+	 */
+	protected function simulate_failure( $sql, array $values = array() ) {
+		$this->last_error = '';
+
+		$subject = empty( $values ) ? $sql : $sql . ' -- ' . implode( ', ', array_map( 'strval', $values ) );
+		foreach ( $this->fail_queries as $pattern ) {
+			if ( preg_match( $pattern, $subject ) ) {
+				$this->last_error = 'Simulated database error';
+
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**

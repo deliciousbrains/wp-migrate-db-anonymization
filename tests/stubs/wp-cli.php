@@ -75,7 +75,12 @@ namespace {
 	}
 
 	if ( ! function_exists( 'wp_cache_flush' ) ) {
+		/**
+		 * Recorded in WP_CLI::$messages so tests can check when it ran.
+		 */
 		function wp_cache_flush() {
+			WP_CLI::$messages[] = array( 'cache_flush', '' );
+
 			return true;
 		}
 	}

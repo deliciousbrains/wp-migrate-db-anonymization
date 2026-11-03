@@ -230,6 +230,131 @@ class CLITest extends TestCase {
 	}
 
 	/**
+	 * The messages of one type, in order.
+	 *
+	 * @param string $type e.g. 'warning'.
+	 *
+	 * @return array
+	 */
+	protected function messages( $type ) {
+		$messages = array();
+		foreach ( \WP_CLI::$messages as $message ) {
+			if ( $type === $message[0] ) {
+				$messages[] = $message[1];
+			}
+		}
+
+		return $messages;
+	}
+
+	/**
+	 * Index of the first message of a type, or -1.
+	 *
+	 * @param string $type
+	 *
+	 * @return int
+	 */
+	protected function message_index( $type ) {
+		foreach ( \WP_CLI::$messages as $index => $message ) {
+			if ( $type === $message[0] ) {
+				return $index;
+			}
+		}
+
+		return -1;
+	}
+
+	public function test_failed_updates_end_with_an_error_after_the_summary() {
+		$this->create_users_table( 'wp_users' );
+		// The primary key is the last value bound to an UPDATE.
+		$this->wpdb->fail_queries = array( '/^UPDATE "wp_users" .* -- .*, 2$/' );
+
+		$this->assert_cli_error(
+			'Anonymized 1 row(s), but 1 row(s) could not be updated. The database is NOT fully anonymized',
+			function () {
+				$this->run_command( array() );
+			}
+		);
+
+		$this->assertSame( array( 'wp_users' ), $this->summary_tables(), 'The summary is still printed.' );
+		$this->assertSame( 1, \WP_CLI::$items[0]['changed'] );
+		$this->assertSame( 1, \WP_CLI::$items[0]['errors'] );
+		$this->assertContains( 'Could not update wp_users row ID = 2: Simulated database error. Further failures in this table are only counted.', $this->messages( 'warning' ) );
+		$this->assertSame( array(), $this->messages( 'success' ) );
+		$this->assertGreaterThan( -1, $this->message_index( 'cache_flush' ), 'Caches are flushed for the rows that did change.' );
+		$this->assertLessThan( $this->message_index( 'error' ), $this->message_index( 'cache_flush' ) );
+
+		$users = $this->wpdb->rows( 'wp_users' );
+		$this->assertMatchesPattern( self::EMAIL_PATTERN, $users['1']->user_email );
+		$this->assertSame( 'bob@real.test', $users['2']->user_email );
+	}
+
+	public function test_failed_batch_select_stops_the_table_and_fails_the_command() {
+		$this->create_backup_table( 'my_backup_table', 5 );
+		$this->wpdb->fail_queries = array( '/^SELECT \* FROM `my_backup_table` WHERE `id` > 2 /' );
+
+		$this->assert_cli_error(
+			'Anonymized 2 row(s), but reading stopped early after a database error in my_backup_table. The database is NOT fully anonymized',
+			function () {
+				$this->run_command( array( 'prefix' => '', 'rules' => $this->private_rules_file(), 'tables' => 'my_backup_table', 'batch-size' => 2 ) );
+			}
+		);
+
+		$this->assertSame( 2, \WP_CLI::$items[0]['scanned'] );
+		$this->assertSame( 2, \WP_CLI::$items[0]['changed'] );
+		$this->assertSame( 1, \WP_CLI::$items[0]['errors'] );
+		$this->assertContains( 'Stopped processing my_backup_table: database error while reading rows: Simulated database error', $this->messages( 'warning' ) );
+
+		$rows = $this->wpdb->rows( 'my_backup_table' );
+		$this->assertMatchesPattern( self::EMAIL_PATTERN, $rows['2']->email );
+		$this->assertSame( 'person3@real.test', $rows['3']->email, 'Rows after the failed batch are left as they were, and reported.' );
+	}
+
+	/**
+	 * @dataProvider failed_read_provider
+	 */
+	public function test_failed_reads_before_the_first_batch_stop_the_table( $pattern, $action ) {
+		$this->create_users_table( 'wp_users' );
+		$this->create_usermeta_table( 'wp_usermeta' );
+		$this->wpdb->fail_queries = array( $pattern );
+
+		$this->assert_cli_error(
+			'reading stopped early after a database error in wp_users. The database is NOT fully anonymized',
+			function () {
+				$this->run_command( array() );
+			}
+		);
+
+		$this->assertContains( 'Stopped processing wp_users: database error while ' . $action . ': Simulated database error', $this->messages( 'warning' ) );
+		$this->assertSame( array( 'wp_users', 'wp_usermeta' ), $this->summary_tables(), 'Other tables are still processed.' );
+		$this->assertSame( 'alice@real.test', $this->wpdb->rows( 'wp_users' )['1']->user_email );
+		$this->assertNotSame( 'Alice', $this->wpdb->rows( 'wp_usermeta' )['1']->meta_value );
+	}
+
+	public function failed_read_provider() {
+		return array(
+			'columns'     => array( '/^SHOW COLUMNS FROM `wp_users`$/', 'reading its columns' ),
+			'primary key' => array( '/^SHOW KEYS FROM `wp_users`/', 'reading its primary key' ),
+			'count'       => array( '/^SELECT COUNT\(\*\) FROM `wp_users`/', 'counting its rows' ),
+			'first batch' => array( '/^SELECT \* FROM `wp_users`/', 'reading rows' ),
+		);
+	}
+
+	public function test_failed_read_in_a_dry_run_fails_the_command() {
+		$this->create_users_table( 'wp_users' );
+		$this->wpdb->fail_queries = array( '/^SELECT \* FROM `wp_users`/' );
+
+		$this->assert_cli_error(
+			'Dry run incomplete: reading stopped early after a database error in wp_users',
+			function () {
+				$this->run_command( array( 'dry-run' => true ) );
+			}
+		);
+
+		$this->assertSame( array( 'wp_users' ), $this->summary_tables() );
+	}
+
+	/**
 	 * @dataProvider valid_prefix_provider
 	 */
 	public function test_valid_prefixes( $prefix ) {

@@ -174,7 +174,18 @@ class CLI {
 
 		Utils\format_items( 'table', $summary, array( 'table', 'scanned', $dry_run ? 'would_change' : 'changed', 'errors' ) );
 
+		$unread = array();
+		foreach ( $summary as $item ) {
+			if ( $item['read_error'] ) {
+				$unread[] = $item['table'];
+			}
+		}
+
 		if ( $dry_run ) {
+			if ( ! empty( $unread ) ) {
+				WP_CLI::error( sprintf( 'Dry run incomplete: reading stopped early after a database error in %s, so the counts above are incomplete. See the warnings above.', implode( ', ', $unread ) ) );
+			}
+
 			WP_CLI::success( 'Dry run complete. No data was changed.' );
 
 			return;
@@ -183,16 +194,29 @@ class CLI {
 		// Persistent object caches may still hold the original values.
 		wp_cache_flush();
 
-		$errors = array_sum( wp_list_pluck( $summary, 'errors' ) );
-		if ( $errors > 0 ) {
-			WP_CLI::warning( sprintf( '%d row(s) could not be updated.', $errors ) );
+		$changed        = array_sum( wp_list_pluck( $summary, 'changed' ) );
+		$failed_updates = array_sum( wp_list_pluck( $summary, 'failed_updates' ) );
+		if ( $failed_updates > 0 || ! empty( $unread ) ) {
+			$problems = array();
+			if ( $failed_updates > 0 ) {
+				$problems[] = sprintf( '%d row(s) could not be updated', $failed_updates );
+			}
+			if ( ! empty( $unread ) ) {
+				$problems[] = sprintf( 'reading stopped early after a database error in %s', implode( ', ', $unread ) );
+			}
+
+			WP_CLI::error( sprintf( 'Anonymized %d row(s), but %s. The database is NOT fully anonymized: personal data remains. See the warnings above.', $changed, implode( ' and ', $problems ) ) );
 		}
 
-		WP_CLI::success( sprintf( 'Anonymized %d row(s).', array_sum( wp_list_pluck( $summary, 'changed' ) ) ) );
+		WP_CLI::success( sprintf( 'Anonymized %d row(s).', $changed ) );
 	}
 
 	/**
 	 * Anonymize one table, streaming rows in batches by primary key.
+	 *
+	 * A database error while reading stops the table, so a failed query is
+	 * never mistaken for the end of the table; it is recorded in the summary
+	 * (read_error) and counted in errors, along with failed updates.
 	 *
 	 * @param Anonymizer $anonymizer
 	 * @param string     $config_table Unprefixed table name used in the config.
@@ -206,15 +230,22 @@ class CLI {
 	protected function process_table( Anonymizer $anonymizer, $config_table, $table, array $columns, $batch_size, $dry_run ) {
 		$wpdb    = $this->wpdb();
 		$summary = array(
-			'table'        => $table,
-			'scanned'      => 0,
-			'changed'      => 0,
-			'would_change' => 0,
-			'errors'       => 0,
+			'table'          => $table,
+			'scanned'        => 0,
+			'changed'        => 0,
+			'would_change'   => 0,
+			'errors'         => 0,
+			// Not shown in the summary table.
+			'failed_updates' => 0,
+			'read_error'     => false,
 		);
 
 		$table_columns = $this->table_columns( $table );
-		$columns       = array_values( array_intersect( $columns, array_keys( $table_columns ) ) );
+		if ( $this->read_failed( $summary, 'reading its columns' ) ) {
+			return $summary;
+		}
+
+		$columns = array_values( array_intersect( $columns, array_keys( $table_columns ) ) );
 		if ( empty( $columns ) ) {
 			WP_CLI::warning( sprintf( 'Skipping %s: none of the configured columns exist.', $table ) );
 
@@ -222,6 +253,10 @@ class CLI {
 		}
 
 		$primary_key = $this->primary_key( $table );
+		if ( $this->read_failed( $summary, 'reading its primary key' ) ) {
+			return $summary;
+		}
+
 		if ( null === $primary_key ) {
 			WP_CLI::warning( sprintf( 'Skipping %s: it needs a single-column primary key.', $table ) );
 
@@ -233,7 +268,11 @@ class CLI {
 		$pk_format    = preg_match( '/int/i', $table_columns[ $primary_key ] ) ? '%d' : '%s';
 		$where        = $this->constraint_where( $anonymizer, $config_table, $columns, array_keys( $table_columns ) );
 
-		$total    = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$quoted_table}" . ( '' !== $where ? " WHERE {$where}" : '' ) );
+		$total = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$quoted_table}" . ( '' !== $where ? " WHERE {$where}" : '' ) );
+		if ( $this->read_failed( $summary, 'counting its rows' ) ) {
+			return $summary;
+		}
+
 		$progress = Utils\make_progress_bar( sprintf( 'Anonymizing %s', $table ), $total );
 		$last_key = null;
 
@@ -251,7 +290,8 @@ class CLI {
 			$sql .= " ORDER BY {$quoted_pk} ASC LIMIT " . (int) $batch_size;
 
 			$rows = $wpdb->get_results( $sql );
-			if ( empty( $rows ) ) {
+			// get_results() returns an empty array on an error too, which must not end the table silently.
+			if ( $this->read_failed( $summary, 'reading rows' ) || empty( $rows ) ) {
 				break;
 			}
 
@@ -267,6 +307,10 @@ class CLI {
 					if ( $dry_run ) {
 						$summary['would_change']++;
 					} elseif ( false === $wpdb->update( $table, $changes, array( $primary_key => $row->{$primary_key} ) ) ) {
+						if ( 0 === $summary['failed_updates'] ) {
+							WP_CLI::warning( sprintf( 'Could not update %1$s row %2$s = %3$s: %4$s. Further failures in this table are only counted.', $table, $primary_key, $row->{$primary_key}, $wpdb->last_error ) );
+						}
+						$summary['failed_updates']++;
 						$summary['errors']++;
 					} else {
 						$summary['changed']++;
@@ -286,6 +330,28 @@ class CLI {
 		$progress->finish();
 
 		return $summary;
+	}
+
+	/**
+	 * Whether the last query for a table failed. If so, records it in the
+	 * table's summary and warns that the table was not fully processed.
+	 *
+	 * @param array  $summary Summary row, updated on failure.
+	 * @param string $action  What the query was doing, e.g. 'reading rows'.
+	 *
+	 * @return bool
+	 */
+	protected function read_failed( array &$summary, $action ) {
+		$error = (string) $this->wpdb()->last_error;
+		if ( '' === $error ) {
+			return false;
+		}
+
+		$summary['errors']++;
+		$summary['read_error'] = true;
+		WP_CLI::warning( sprintf( 'Stopped processing %1$s: database error while %2$s: %3$s', $summary['table'], $action, $error ) );
+
+		return true;
 	}
 
 	/**
