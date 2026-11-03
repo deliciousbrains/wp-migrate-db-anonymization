@@ -315,6 +315,29 @@ class CLITest extends TestCase {
 		$this->assertEquals( $before, $this->wpdb->rows( 'my_backup_table' ), 'The rolled back rows keep their original values.' );
 	}
 
+	public function test_failed_table_check_stops_the_command_before_writing() {
+		$this->create_users_table( 'wp_users' );
+		$this->create_usermeta_table( 'wp_usermeta' );
+		$users = $this->wpdb->rows( 'wp_users' );
+		// The translated SHOW TABLES LIKE for wp_usermeta.
+		$this->wpdb->fail_queries = array( '/^SELECT name FROM sqlite_master .* LIKE \'wp\\\\_usermeta\' ESCAPE/' );
+
+		$this->assert_cli_error(
+			'Could not check whether the table wp_usermeta exists: Simulated database error. Nothing was changed.',
+			function () {
+				$this->run_command( array() );
+			}
+		);
+
+		$this->assertSame( -1, $this->message_index( 'confirm' ), 'Stops before asking to overwrite data.' );
+		$this->assertSame( array(), \WP_CLI::$items );
+		$writes = array_filter( $this->wpdb->queries, function ( $sql ) {
+			return 0 === strpos( $sql, 'UPDATE' ) || 'BEGIN' === $sql;
+		} );
+		$this->assertSame( array(), $writes );
+		$this->assertEquals( $users, $this->wpdb->rows( 'wp_users' ) );
+	}
+
 	public function test_failed_batch_select_stops_the_table_and_fails_the_command() {
 		$this->create_backup_table( 'my_backup_table', 5 );
 		$this->wpdb->fail_queries = array( '/^SELECT \* FROM `my_backup_table` WHERE `id` > 2 /' );

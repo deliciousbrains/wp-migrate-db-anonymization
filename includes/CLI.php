@@ -735,14 +735,23 @@ class CLI {
 	}
 
 	/**
+	 * Whether a table exists. A database error stops the command: it must not
+	 * be mistaken for a missing table, which would silently leave that
+	 * table's personal data in place.
+	 *
 	 * @param string $table
 	 *
 	 * @return bool
 	 */
 	protected function table_exists( $table ) {
-		$wpdb = $this->wpdb();
+		$wpdb  = $this->wpdb();
+		$found = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) );
 
-		return $table === $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) );
+		if ( '' !== (string) $wpdb->last_error ) {
+			WP_CLI::error( sprintf( 'Could not check whether the table %1$s exists: %2$s. Nothing was changed.', $table, $wpdb->last_error ) );
+		}
+
+		return $table === $found;
 	}
 
 	/**
