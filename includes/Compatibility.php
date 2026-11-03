@@ -90,7 +90,10 @@ class WPMDB_Anonymization_Compatibility {
 			return;
 		}
 
-		$deactivate_url = wp_nonce_url( admin_url( 'plugins.php?action=deactivate&plugin=' . $this->plugin_basename ), 'deactivate-plugin_' . $this->plugin_basename );
+		// A network-active plugin can only be deactivated from the Network Admin Plugins screen.
+		$network_active = is_multisite() && function_exists( 'is_plugin_active_for_network' ) && is_plugin_active_for_network( $this->plugin_basename );
+		$plugins_url    = $network_active ? network_admin_url( 'plugins.php' ) : admin_url( 'plugins.php' );
+		$deactivate_url = wp_nonce_url( add_query_arg( array( 'action' => 'deactivate', 'plugin' => $this->plugin_basename ), $plugins_url ), 'deactivate-plugin_' . $this->plugin_basename );
 		$requirements   = implode( ', ', $requirements );
 
 		$this->render_notice( $deactivate_url, $requirements );

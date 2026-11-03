@@ -28,9 +28,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-// Bootstrap our autoloader. If the vendor directory is missing, load the
-// compatibility checker on its own so it can report the problem.
-if ( file_exists( __DIR__ . '/vendor/autoload.php' ) ) {
+// Bootstrap our autoloader. On PHP older than the minimum (7.4, as in
+// WPMDB_Anonymization_Compatibility), or if the vendor directory is missing,
+// load the compatibility checker on its own so it can report the problem:
+// the dependencies use syntax that older PHP versions can't parse.
+if ( version_compare( PHP_VERSION, '7.4', '>=' ) && file_exists( __DIR__ . '/vendor/autoload.php' ) ) {
 	require_once __DIR__ . '/vendor/autoload.php';
 } else {
 	require_once __DIR__ . '/includes/Compatibility.php';
