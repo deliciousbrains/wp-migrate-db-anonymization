@@ -362,6 +362,7 @@ class FormsLogsCredentialsRulesTest extends TestCase {
 			'WooCommerce truncated key'   => array( 'woocommerce_api_keys', 'truncated_key', null, '/^[a-f0-9]{7}$/' ),
 			'WooCommerce API nonces'      => array( 'woocommerce_api_keys', 'nonces', null, '/^a:0:\{\}$/' ),
 			'WooCommerce webhook secret'  => array( 'wc_webhooks', 'secret', null, '/^[A-Za-z0-9]{50}$/' ),
+			'WooCommerce webhook status'  => array( 'wc_webhooks', 'status', null, '/^disabled$/' ),
 			'Application passwords'       => array( 'usermeta', 'meta_value', '_application_passwords', '/^a:0:\{\}$/' ),
 			'Two Factor TOTP secret'      => array( 'usermeta', 'meta_value', '_two_factor_totp_key', '/^[A-Z2-7]{32}$/' ),
 			'Two Factor email token'      => array( 'usermeta', 'meta_value', '_two_factor_email_token', '/^[a-f0-9]{32}$/' ),
@@ -385,6 +386,37 @@ class FormsLogsCredentialsRulesTest extends TestCase {
 		$row        = $this->row( null === $meta_key ? array( $column => $original ) : array( 'meta_key' => $meta_key, $column => $original ) );
 
 		$this->assertMatchesRegularExpression( $pattern, (string) $anonymizer->anonymize_value( $table, $column, $row, $original ) );
+	}
+
+	/**
+	 * @return array
+	 */
+	public static function deterministic_provider() {
+		return array(
+			'random'        => array( '' ),
+			'deterministic' => array( 'unit-test-secret' ),
+		);
+	}
+
+	/**
+	 * @dataProvider deterministic_provider
+	 */
+	public function test_webhooks_are_disabled_and_delivered_to_reserved_domains( $secret ) {
+		$anonymizer = new Anonymizer( $this->make_config( $this->config_file( 'credentials' ) ), $this->make_faker(), new Deterministic( $secret ) );
+		$webhook    = $this->row(
+			array(
+				'webhook_id'   => '1',
+				'status'       => 'active',
+				'delivery_url' => 'https://hooks.example.org/services/T000/B000/abc123',
+			)
+		);
+
+		$url = $anonymizer->anonymize_value( 'wc_webhooks', 'delivery_url', $webhook, $webhook->delivery_url );
+		$this->assertMatchesRegularExpression( '#^https://[a-z0-9-]+-[0-9a-f]{12}\.example\.com/$#', $url );
+
+		foreach ( array( 'active', 'paused', 'disabled' ) as $status ) {
+			$this->assertSame( 'disabled', $anonymizer->anonymize_value( 'wc_webhooks', 'status', $webhook, $status ) );
+		}
 	}
 
 	public function test_credentials_meta_rules_can_be_pushed_into_sql() {

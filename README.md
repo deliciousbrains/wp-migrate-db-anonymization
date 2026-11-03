@@ -47,7 +47,7 @@ You can also programmatically control which users are whitelisted with the follo
     
 ## Covered data
 
-The anonymization rules live in the `config` directory, one file per plugin. Order totals, dates, statuses, product data and IDs are never changed, so reports run on an anonymized copy still add up.
+The anonymization rules live in the `config` directory, one file per plugin. Order totals, dates, statuses, product data and IDs are never changed, so reports run on an anonymized copy still add up. The one status that is changed is a WooCommerce webhook's, which is disabled (see [Credentials](#credentials)).
 
 - `wordpress.php` (always loaded)
     - `users`: login, password, nicename, email, URL and display name
@@ -89,7 +89,7 @@ The anonymization rules live in the `config` directory, one file per plugin. Ord
     - `usermeta`: application passwords, Two Factor TOTP secrets, backup codes and email tokens, Metorik cart tokens
     - `postmeta` and `wc_orders_meta`: WooCommerce Print Invoice & Delivery Note guest access and PDF tokens, Metorik cart tokens
     - `woocommerce_api_keys`: consumer key and secret, truncated key and nonces
-    - `wc_webhooks`: secret and delivery URL
+    - `wc_webhooks`: secret and delivery URL; the status is set to `disabled`
 - `credentials-easy-digital-downloads.php` (loaded with `easy-digital-downloads.php`; see [Credentials](#credentials))
     - `usermeta`: user API keys
     - `options`: user API keys cached in transients
@@ -121,7 +121,9 @@ To force a plugin's rules on or off, use the `wpmdb_anonymization_load_config_fi
 
 ### Credentials
 
-API keys, tokens and secrets aren't personal data, but they give access to the live site, its customers' orders and downloads, or the services it sends webhooks to, so `credentials.php` replaces them by default. Each is replaced with a random value of the same shape (for example 32 hexadecimal characters for an MD5-style key) so code that checks the format still works, but the replacements aren't working credentials: create new keys on the copy if you need them. Replacing webhook delivery URLs also stops the copy sending webhooks to live services.
+API keys, tokens and secrets aren't personal data, but they give access to the live site, its customers' orders and downloads, or the services it sends webhooks to, so `credentials.php` replaces them by default. Each is replaced with a random value of the same shape (for example 32 hexadecimal characters for an MD5-style key) so code that checks the format still works, but the replacements aren't working credentials: create new keys on the copy if you need them.
+
+WooCommerce webhooks are disabled, so the copy never sends order or customer data to the services the live site uses, and their delivery URLs, which often include a token, are replaced with subdomains of the reserved `example.com` domain. To test a webhook on the copy, point it at a test endpoint and set its status back to Active under WooCommerce > Settings > Advanced > Webhooks.
 
 Two Factor TOTP secrets and backup codes are replaced too, so users who set up two-factor authentication on the live site, including whitelisted users, need to set it up again on the copy, or deactivate the Two Factor plugin there.
 

@@ -101,8 +101,14 @@ return array(
 			'fake_data_type' => 'regexify',
 			'fake_data_args' => array( '[A-Za-z0-9]{50}' ),
 		),
-		// Endpoints often include a token. Replacing them also stops the copy
-		// sending webhooks to live services.
+		// Endpoints often include a token. Fake URLs are subdomains of the
+		// reserved example.com domain, so they never reach a real host.
 		'delivery_url' => array( 'fake_data_type' => 'url' ),
+		// WooCommerce only delivers active webhooks (WC_Webhook::should_deliver()),
+		// so the copy never sends any. Re-enable a webhook on the copy if needed.
+		'status'       => array(
+			'fake_data_type' => 'randomElement',
+			'fake_data_args' => array( array( 'disabled' ) ),
+		),
 	),
 );
