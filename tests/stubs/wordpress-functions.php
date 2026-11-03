@@ -19,6 +19,20 @@ if ( ! function_exists( 'wpmdb_anonymization_tests_reset_hooks' ) ) {
 
 wpmdb_anonymization_tests_reset_hooks();
 
+if ( ! function_exists( 'wpmdb_anonymization_tests_set_environment_type' ) ) {
+	/**
+	 * Set the value wp_get_environment_type() returns. The base TestCase
+	 * resets it to 'local' before each test.
+	 *
+	 * @param string $type e.g. 'production'.
+	 */
+	function wpmdb_anonymization_tests_set_environment_type( $type ) {
+		$GLOBALS['wpmdb_anonymization_tests_environment_type'] = $type;
+	}
+}
+
+wpmdb_anonymization_tests_set_environment_type( 'local' );
+
 if ( ! function_exists( 'add_filter' ) ) {
 	function add_filter( $hook_name, $callback, $priority = 10, $accepted_args = 1 ) {
 		$GLOBALS['wpmdb_anonymization_tests_hooks'][ $hook_name ][ $priority ][] = array(
@@ -117,5 +131,14 @@ if ( ! function_exists( '__return_true' ) ) {
 if ( ! function_exists( '__return_false' ) ) {
 	function __return_false() {
 		return false;
+	}
+}
+
+if ( ! function_exists( 'wp_get_environment_type' ) ) {
+	/**
+	 * Returns the type set with wpmdb_anonymization_tests_set_environment_type().
+	 */
+	function wp_get_environment_type() {
+		return $GLOBALS['wpmdb_anonymization_tests_environment_type'];
 	}
 }

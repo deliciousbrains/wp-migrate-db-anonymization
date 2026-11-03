@@ -187,6 +187,48 @@ class CLITest extends TestCase {
 		$this->assertMatchesPattern( self::EMAIL_PATTERN, $rows['5']->meta_value );
 	}
 
+	public function test_production_environment_refuses_to_write_without_force() {
+		$this->create_users_table( 'wp_users' );
+		$users = $this->wpdb->rows( 'wp_users' );
+		$this->wpdb->queries = array();
+		wpmdb_anonymization_tests_set_environment_type( 'production' );
+
+		$this->assert_cli_error(
+			'The environment type is "production"',
+			function () {
+				$this->run_command( array() );
+			}
+		);
+
+		$this->assertSame( array(), $this->wpdb->queries, 'Stops before reading the database.' );
+		$this->assertEquals( $users, $this->wpdb->rows( 'wp_users' ) );
+	}
+
+	public function test_production_environment_writes_with_force() {
+		$this->create_users_table( 'wp_users' );
+		wpmdb_anonymization_tests_set_environment_type( 'production' );
+
+		$this->run_command( array( 'force' => true ) );
+
+		$this->assertSame( array( 'wp_users' ), $this->summary_tables() );
+		$users = $this->wpdb->rows( 'wp_users' );
+		$this->assertMatchesPattern( self::EMAIL_PATTERN, $users['1']->user_email );
+		$this->assertContains( array( 'success', 'Anonymized 2 row(s).' ), \WP_CLI::$messages );
+	}
+
+	public function test_production_environment_allows_dry_run_without_force() {
+		$this->create_users_table( 'wp_users' );
+		$users = $this->wpdb->rows( 'wp_users' );
+		wpmdb_anonymization_tests_set_environment_type( 'production' );
+
+		$this->run_command( array( 'dry-run' => true ) );
+
+		$this->assertSame( array( 'wp_users' ), $this->summary_tables() );
+		$this->assertSame( 2, (int) \WP_CLI::$items[0]['would_change'] );
+		$this->assertContains( array( 'success', 'Dry run complete. No data was changed.' ), \WP_CLI::$messages );
+		$this->assertEquals( $users, $this->wpdb->rows( 'wp_users' ) );
+	}
+
 	/**
 	 * @dataProvider valid_prefix_provider
 	 */
