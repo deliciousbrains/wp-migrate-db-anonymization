@@ -216,7 +216,10 @@ class CLI {
 	 *
 	 * A database error while reading stops the table, so a failed query is
 	 * never mistaken for the end of the table; it is recorded in the summary
-	 * (read_error) and counted in errors, along with failed updates.
+	 * (read_error) and counted in errors, along with failed updates. Each
+	 * batch is written in a transaction, and its rows only count as changed
+	 * once the COMMIT succeeds; if it fails, the batch is rolled back and its
+	 * rows count as failed updates.
 	 *
 	 * @param Anonymizer $anonymizer
 	 * @param string     $config_table Unprefixed table name used in the config.
@@ -237,6 +240,7 @@ class CLI {
 			'errors'         => 0,
 			// Not shown in the summary table.
 			'failed_updates' => 0,
+			'failed_commits' => 0,
 			'read_error'     => false,
 		);
 
@@ -309,6 +313,9 @@ class CLI {
 				$wpdb->query( 'START TRANSACTION' );
 			}
 
+			// Rows updated in this batch, only counted as changed once the batch is committed.
+			$updated = 0;
+
 			foreach ( $rows as $row ) {
 				$summary['scanned']++;
 				$changes = $this->row_changes( $anonymizer, $config_table, $columns, $row );
@@ -323,7 +330,7 @@ class CLI {
 						$summary['failed_updates']++;
 						$summary['errors']++;
 					} else {
-						$summary['changed']++;
+						$updated++;
 					}
 				}
 
@@ -331,7 +338,7 @@ class CLI {
 			}
 
 			if ( ! $dry_run ) {
-				$wpdb->query( 'COMMIT' );
+				$this->commit_batch( $summary, $updated, $primary_key, reset( $rows )->{$primary_key}, end( $rows )->{$primary_key} );
 			}
 
 			$last_key = end( $rows )->{$primary_key};
@@ -340,6 +347,38 @@ class CLI {
 		$progress->finish();
 
 		return $summary;
+	}
+
+	/**
+	 * Commit a batch's updates and count them as changed. If the COMMIT
+	 * fails, the batch is rolled back and its updated rows are counted as
+	 * failed updates instead, so the command ends with an error.
+	 *
+	 * @param array  $summary     Summary row, updated.
+	 * @param int    $updated     Rows updated in the batch.
+	 * @param string $primary_key
+	 * @param mixed  $first_key   Primary key of the batch's first row.
+	 * @param mixed  $last_key    Primary key of the batch's last row.
+	 */
+	protected function commit_batch( array &$summary, $updated, $primary_key, $first_key, $last_key ) {
+		$wpdb   = $this->wpdb();
+		$result = $wpdb->query( 'COMMIT' );
+		$error  = (string) $wpdb->last_error;
+
+		if ( false !== $result && '' === $error ) {
+			$summary['changed'] += $updated;
+
+			return;
+		}
+
+		$wpdb->query( 'ROLLBACK' );
+
+		if ( 0 === $summary['failed_commits'] ) {
+			WP_CLI::warning( sprintf( 'Could not commit the batch of %1$s rows with %2$s %3$s to %4$s, so its %5$d updated row(s) were rolled back: %6$s. Further failed batches in this table are only counted.', $summary['table'], $primary_key, $first_key, $last_key, $updated, '' === $error ? 'unknown database error' : $error ) );
+		}
+		$summary['failed_commits']++;
+		$summary['failed_updates'] += $updated;
+		$summary['errors']         += $updated;
 	}
 
 	/**

@@ -289,6 +289,32 @@ class CLITest extends TestCase {
 		$this->assertSame( 'bob@real.test', $users['2']->user_email );
 	}
 
+	public function test_failed_commit_rolls_back_the_batch_and_fails_the_command() {
+		$this->create_backup_table( 'my_backup_table', 5 );
+		$before                   = $this->wpdb->rows( 'my_backup_table' );
+		$this->wpdb->fail_queries = array( '/^COMMIT$/' );
+
+		$this->assert_cli_error(
+			'Anonymized 0 row(s), but 5 row(s) could not be updated. The database is NOT fully anonymized',
+			function () {
+				$this->run_command( array( 'prefix' => '', 'rules' => $this->private_rules_file(), 'tables' => 'my_backup_table', 'batch-size' => 2 ) );
+			}
+		);
+
+		$this->assertSame( 5, \WP_CLI::$items[0]['scanned'] );
+		$this->assertSame( 0, \WP_CLI::$items[0]['changed'], 'Rows only count as changed once committed.' );
+		$this->assertSame( 5, \WP_CLI::$items[0]['errors'] );
+		$this->assertSame( 3, count( array_keys( $this->wpdb->queries, 'ROLLBACK', true ) ), 'Every failed batch is rolled back.' );
+
+		$warnings = array_values( array_filter( $this->messages( 'warning' ), function ( $message ) {
+			return 0 === strpos( $message, 'Could not commit' );
+		} ) );
+		$this->assertSame( array( 'Could not commit the batch of my_backup_table rows with id 1 to 2, so its 2 updated row(s) were rolled back: Simulated database error. Further failed batches in this table are only counted.' ), $warnings );
+		$this->assertSame( array(), $this->messages( 'success' ) );
+
+		$this->assertEquals( $before, $this->wpdb->rows( 'my_backup_table' ), 'The rolled back rows keep their original values.' );
+	}
+
 	public function test_failed_batch_select_stops_the_table_and_fails_the_command() {
 		$this->create_backup_table( 'my_backup_table', 5 );
 		$this->wpdb->fail_queries = array( '/^SELECT \* FROM `my_backup_table` WHERE `id` > 2 /' );
