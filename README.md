@@ -93,6 +93,7 @@ The anonymization rules live in the `config` directory, one file per plugin. Ord
 - `credentials-easy-digital-downloads.php` (loaded with `easy-digital-downloads.php`; see [Credentials](#credentials))
     - `usermeta`: user API keys
     - `postmeta`: EDD 2.x API log keys and tokens, EDD Software Licensing 2.x license keys
+    - `posts`: query string of EDD 2.x API request logs (the excerpt of `edd_log` posts)
     - `edd_logs_api_requests`: API key, token and request query string. In both API request logs, `public`, which EDD records as the key and token of a request made without an API key, is kept
     - `edd_licenses`: license key
 

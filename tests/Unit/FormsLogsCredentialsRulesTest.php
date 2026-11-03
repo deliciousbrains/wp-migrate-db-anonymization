@@ -251,6 +251,30 @@ class FormsLogsCredentialsRulesTest extends TestCase {
 		}
 	}
 
+	public function test_edd_2_api_request_log_query_string_is_replaced() {
+		$anonymizer = $this->make_anonymizer( $this->credentials_config() );
+		$query      = 'edd-api=sales&key=' . self::sample_key() . '&token=' . strrev( self::sample_key() ) . '&email=jane%40example.org';
+		$log        = $this->row( array( 'ID' => '5', 'post_type' => 'edd_log', 'post_excerpt' => $query ) );
+
+		$this->assertSame( 'edd-api=', $anonymizer->anonymize_value( 'posts', 'post_excerpt', $log, $log->post_excerpt ), 'Same as edd_logs_api_requests.request.' );
+
+		$empty = $this->row( array( 'ID' => '6', 'post_type' => 'edd_log', 'post_excerpt' => '' ) );
+		$this->assertSame( '', $anonymizer->anonymize_value( 'posts', 'post_excerpt', $empty, $empty->post_excerpt ), 'Other log types have no excerpt, which stays empty.' );
+
+		foreach ( array( 'post', 'download', 'edd_payment' ) as $post_type ) {
+			$other = $this->row( array( 'ID' => '7', 'post_type' => $post_type, 'post_excerpt' => 'A short summary.' ) );
+			$this->assertSame( 'A short summary.', $anonymizer->anonymize_value( 'posts', 'post_excerpt', $other, $other->post_excerpt ) );
+		}
+	}
+
+	public function test_edd_2_api_request_log_rule_can_be_pushed_into_sql() {
+		$data  = $this->config_file( 'credentials-easy-digital-downloads' );
+		$rules = $this->make_config( $data )->rules( 'posts', 'post_excerpt' );
+
+		$this->assertCount( 1, $rules );
+		$this->assertSame( array( 'post_type', array( 'edd_log' ) ), $rules[0]->get_constraint_values() );
+	}
+
 	public function test_edd_software_licensing_2_keys_have_no_public_exception() {
 		$anonymizer = $this->make_anonymizer( $this->credentials_config() );
 

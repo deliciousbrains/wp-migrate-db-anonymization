@@ -55,6 +55,17 @@ return array(
 			),
 		),
 	),
+	'posts'                 => array(
+		// EDD 2.x logs are edd_log posts. An API request log stores the request's
+		// query string in the excerpt, including the key, token and any customer
+		// email address or purchase key (EDD 3 migrates it to
+		// edd_logs_api_requests.request). EDD sets no excerpt on other log types.
+		'post_excerpt' => array(
+			'constraint'     => array( 'post_type' => 'edd_log' ),
+			'fake_data_type' => 'randomElement',
+			'fake_data_args' => array( array( 'edd-api=' ) ),
+		),
+	),
 	'edd_logs_api_requests' => array(
 		// The API key and token used, or 'public' for requests made without a
 		// key, which is kept.
