@@ -709,6 +709,12 @@ class CLI {
 	 */
 	protected function wpdb_for_prefix( $prefix ) {
 		$wpdb = $this->wpdb();
+		// Free the last result before cloning: a clone would share the same
+		// mysqli_result, and when both copies flush it PHP 8 fails with
+		// "mysqli_result object is already closed".
+		if ( method_exists( $wpdb, 'flush' ) ) {
+			$wpdb->flush();
+		}
 		$copy = clone $wpdb;
 
 		$copy->base_prefix = $prefix;
