@@ -151,6 +151,22 @@ class FormsLogsCredentialsRulesTest extends TestCase {
 		}
 	}
 
+	public function test_gravity_forms_draft_uuid_is_replaced_in_the_same_format() {
+		$data       = $this->config_file( 'gravity-forms' );
+		$anonymizer = $this->make_anonymizer( $data );
+		// Same shape as GFFormsModel::get_uuid(): 32 lowercase hex characters.
+		$row = $this->row( array( 'uuid' => bin2hex( random_bytes( 16 ) ) ) );
+
+		foreach ( array( 'gf_draft_submissions', 'rg_incomplete_submissions' ) as $table ) {
+			$this->assertArrayHasKey( 'uuid', $data[ $table ], "{$table}.uuid has a rule." );
+
+			$value = $anonymizer->anonymize_value( $table, 'uuid', $row, $row->uuid );
+
+			$this->assertMatchesRegularExpression( '/^[0-9a-f]{32}$/', $value );
+			$this->assertNotSame( $row->uuid, $value );
+		}
+	}
+
 	public function test_redirection_keeps_the_url_and_empties_request_data() {
 		$data       = $this->config_file( 'redirection' );
 		$anonymizer = $this->make_anonymizer( $data );

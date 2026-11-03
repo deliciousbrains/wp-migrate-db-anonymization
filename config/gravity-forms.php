@@ -25,6 +25,11 @@ $field_value_rule = array(
 );
 
 $draft_rules = array(
+	// The resume token in Save and Continue links (`gf_token`), 32 lowercase hex
+	// characters. Replace it so the copy's tokens can't resume drafts on the live
+	// site. It is the primary key, so the WP-CLI command skips it: empty these
+	// tables instead (see the README).
+	'uuid'       => array( 'fake_data_type' => 'md5' ),
 	'email'      => array( 'fake_data_type' => 'email' ),
 	'ip'         => $ip_rule,
 	'source_url' => $url_rule,

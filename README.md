@@ -81,7 +81,7 @@ The anonymization rules live in the `config` directory, one file per plugin. Ord
     - `gf_entry` and `rg_lead`: IP address, user agent and source URL
     - `gf_entry_meta`, `rg_lead_detail` and `rg_lead_detail_long`: every field value, replaced with a sentence (see [Gravity Forms field values](#gravity-forms-field-values)). Entry meta that isn't a field value, such as add-on feed status, is kept
     - `gf_entry_notes` and `rg_lead_notes`: note content and author name
-    - `gf_draft_submissions` and `rg_incomplete_submissions` (Save and Continue): email, IP address and source URL; the saved field values are replaced with an empty JSON object
+    - `gf_draft_submissions` and `rg_incomplete_submissions` (Save and Continue): email, IP address and source URL; the saved field values are replaced with an empty JSON object, and the resume token is replaced in exports, pushes and pulls (see [Gravity Forms drafts](#gravity-forms-drafts))
     - `gf_form_view` and `rg_form_view`: IP address
 - `redirection.php` (Redirection; loaded if a `redirection_404` or `redirection_logs` table exists)
     - `redirection_404` and `redirection_logs`: IP address, user agent, referrer and request data (logged HTTP headers), replaced with an empty JSON object. The requested URL and domain are kept so the logs stay useful, so personal data in a logged URL's query string is not removed
@@ -178,6 +178,19 @@ To keep a field's values as they are, skip the rule for those rows with the `wpm
 
 Field IDs are matched with a regular expression, so the WP-CLI command reads every row of `gf_entry_meta` whether or not you add rules like these.
 
+### Gravity Forms drafts
+
+Save and Continue drafts are stored in `gf_draft_submissions`, or `rg_incomplete_submissions` before Gravity Forms 2.3. Each draft's `uuid` is also its resume token: the `gf_token` in the link sent to the user, which opens the saved entry. Drafts are short-lived resume links; Gravity Forms deletes them after 30 days by default (`gform_incomplete_submissions_expiration_days`).
+
+Exports, pushes and pulls replace the token with a random 32-character hex value, the same format Gravity Forms uses, so tokens in the copy can't open or resume drafts on the live site.
+
+The WP-CLI command can't replace the token, because `uuid` is the table's primary key (see [WP-CLI](#wp-cli)). When anonymizing in place, empty both tables, using your table prefix in place of `wp_`:
+
+    wp db query "TRUNCATE TABLE wp_gf_draft_submissions"
+    wp db query "TRUNCATE TABLE wp_rg_incomplete_submissions"
+
+The second table can only exist on sites that ran Gravity Forms 2.2 or earlier; skip it if it doesn't.
+
 ### Column constraints
 
 A rule's `constraint` can limit it to rows where another column has a particular value. Besides an exact value, it accepts a list of values or a regular expression (including delimiters):
@@ -251,7 +264,7 @@ Example output:
 How it works:
 
 - Rows are read in batches ordered by primary key and changed values are written back row by row, one transaction per batch. Tables without a single-column primary key are skipped with a warning.
-- Rules on a table's primary-key column are skipped with a warning: rows are read in key order, so changing the keys would skip or repeat rows. If the keys themselves are personal data, empty such tables instead.
+- Rules on a table's primary-key column are skipped with a warning: rows are read in key order, so changing the keys would skip or repeat rows. If the keys themselves are personal data, empty such tables instead. Gravity Forms draft resume tokens are one example: see [Gravity Forms drafts](#gravity-forms-drafts).
 - When every rule for a table is limited to specific values of a column, as with the `meta_key` rules for `usermeta` and `postmeta`, only those rows are read (`WHERE meta_key IN (...)`) instead of the whole table.
 - A simple regex constraint, such as a meta key suffix, is read with `LIKE` patterns instead. A regex ending in `$` also matches a value ending in a newline, as it does in PHP, so those rows are read too. A constraint on several columns is pushed down by one of them, the first with exact values or a list, otherwise the first simple regex; the other columns are still checked on each row.
 - The user whitelist constant and filter are respected, and empty values are left empty.
