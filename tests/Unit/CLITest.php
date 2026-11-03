@@ -396,7 +396,7 @@ class CLITest extends TestCase {
 		);
 
 		$this->assertContains( 'Stopped processing wp_users: database error while ' . $action . ': Simulated database error', $this->messages( 'warning' ) );
-		$this->assertSame( array( 'wp_users', 'wp_usermeta' ), $this->summary_tables(), 'Other tables are still processed.' );
+		$this->assertEqualsCanonicalizing( array( 'wp_users', 'wp_usermeta' ), $this->summary_tables(), 'Other tables are still processed (order follows the rule files).' );
 		$this->assertSame( 'alice@real.test', $this->wpdb->rows( 'wp_users' )['1']->user_email );
 		$this->assertNotSame( 'Alice', $this->wpdb->rows( 'wp_usermeta' )['1']->meta_value );
 	}
