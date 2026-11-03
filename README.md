@@ -70,9 +70,9 @@ The anonymization rules live in the `config` directory, one file per plugin. Ord
 - `easy-digital-downloads.php` (EDD 3.x, plus EDD 2.x data left after upgrading)
     - `edd_customers`, `edd_customer_email_addresses` and `edd_customer_addresses`: name, email, address and EDD 2.x customer notes
     - `edd_orders` and `edd_order_addresses`: email, IP address, name and address
-    - `edd_customermeta` and `edd_ordermeta`: company, phone, last login IP, additional emails, Stripe and PayPal customer IDs, PayPal Express payer ID, EDD Invoices company and VAT number
+    - `edd_customermeta` and `edd_ordermeta`: company, phone, last login IP, additional emails, Stripe and PayPal customer IDs, PayPal payer email, PayPal Express payer ID, EDD Invoices company and VAT number
     - `edd_notes`: note content
-    - `edd_payment_tokens`: gateway token and customer ID
+    - `edd_payment_tokens`: gateway token and customer ID, label (e.g. PayPal email or card last 4 digits), replaced with a generic label, and payment source details, replaced with an empty JSON object
     - `edd_logs_api_requests`, `edd_logs_file_downloads` and `edd_logs_emails`: IP address, user agent and email
     - `edd_subscriptions` (Recurring Payments): notes
     - `edd_license_activations` (Software Licensing): site URL

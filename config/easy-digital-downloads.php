@@ -72,6 +72,11 @@ return array(
 				'fake_data_type' => 'phoneNumber',
 			),
 			array(
+				// PayPal account email, shown on the receipt when the buyer paid with PayPal.
+				'constraint'     => array( 'meta_key' => '_edd_paypal_payer_email' ),
+				'fake_data_type' => 'email',
+			),
+			array(
 				// EDD Invoices.
 				'constraint'     => array( 'meta_key' => 'invoices_company' ),
 				'fake_data_type' => 'company',
@@ -92,6 +97,19 @@ return array(
 	'edd_payment_tokens'           => array(
 		'token_id'            => array( 'fake_data_type' => 'md5' ),
 		'gateway_customer_id' => array( 'fake_data_type' => 'ean13' ),
+		// The PayPal vault builds the label from the payment source, e.g.
+		// "PayPal - buyer@example.com" or "Visa ending in 4242".
+		'label'               => array(
+			'fake_data_type' => 'randomElement',
+			'fake_data_args' => array( array( 'Saved payment method' ) ),
+		),
+		// PayPal's full payment source response as JSON, which can include the
+		// payer's email, name and address, or the cardholder's name and card
+		// details. Replace with an empty JSON object, which decodes to an empty array.
+		'payment_source'      => array(
+			'fake_data_type' => 'randomElement',
+			'fake_data_args' => array( array( '{}' ) ),
+		),
 	),
 	'edd_logs_api_requests'        => array(
 		'ip' => array( 'fake_data_type' => 'ipv4' ),
