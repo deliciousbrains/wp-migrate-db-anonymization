@@ -22,6 +22,25 @@ class FormsLogsCredentialsRulesTest extends TestCase {
 	}
 
 	/**
+	 * The rules from credentials.php and credentials-easy-digital-downloads.php,
+	 * merged by the Loader as on a site with EDD data.
+	 *
+	 * @return array
+	 */
+	protected function credentials_config() {
+		add_filter(
+			'wpmdb_anonymization_load_config_file',
+			function ( $load, $name ) {
+				return 0 === strpos( $name, 'credentials' ) ? $load : false;
+			},
+			10,
+			2
+		);
+
+		return ( new Loader( WPMDB_ANONYMIZATION_PLUGIN_FILE ) )->load( new TablesWpdb( array( 'edd_orders' ) ) );
+	}
+
+	/**
 	 * @param array $data
 	 *
 	 * @return Anonymizer
@@ -158,7 +177,7 @@ class FormsLogsCredentialsRulesTest extends TestCase {
 	}
 
 	public function test_edd_api_keys_stored_as_meta_keys_are_replaced() {
-		$anonymizer = $this->make_anonymizer( $this->config_file( 'credentials' ) );
+		$anonymizer = $this->make_anonymizer( $this->config_file( 'credentials-easy-digital-downloads' ) );
 		$stored_key = self::sample_key();
 		$row        = $this->row(
 			array(
@@ -177,7 +196,7 @@ class FormsLogsCredentialsRulesTest extends TestCase {
 	}
 
 	public function test_edd_api_keys_from_before_2_4_are_replaced() {
-		$anonymizer = $this->make_anonymizer( $this->config_file( 'credentials' ) );
+		$anonymizer = $this->make_anonymizer( $this->config_file( 'credentials-easy-digital-downloads' ) );
 		$row        = $this->row(
 			array(
 				'meta_key'   => 'edd_user_public_key',
@@ -190,7 +209,7 @@ class FormsLogsCredentialsRulesTest extends TestCase {
 	}
 
 	public function test_edd_api_request_log_keeps_public_requests() {
-		$anonymizer = $this->make_anonymizer( $this->config_file( 'credentials' ) );
+		$anonymizer = $this->make_anonymizer( $this->config_file( 'credentials-easy-digital-downloads' ) );
 		$public     = $this->row( array( 'api_key' => 'public', 'token' => 'public' ) );
 		$keyed      = $this->row( array( 'api_key' => self::sample_key(), 'token' => strrev( self::sample_key() ) ) );
 
@@ -233,7 +252,7 @@ class FormsLogsCredentialsRulesTest extends TestCase {
 	 * @dataProvider credential_shape_provider
 	 */
 	public function test_credentials_are_replaced_with_values_of_the_same_shape( $table, $column, $meta_key, $pattern ) {
-		$anonymizer = $this->make_anonymizer( $this->config_file( 'credentials' ) );
+		$anonymizer = $this->make_anonymizer( $this->credentials_config() );
 		$original   = 'original-secret-value';
 		$row        = $this->row( null === $meta_key ? array( $column => $original ) : array( 'meta_key' => $meta_key, $column => $original ) );
 
@@ -242,14 +261,25 @@ class FormsLogsCredentialsRulesTest extends TestCase {
 
 	public function test_credentials_meta_rules_can_be_pushed_into_sql() {
 		$meta_tables = array( 'usermeta', 'postmeta', 'wc_orders_meta' );
-		$data        = $this->config_file( 'credentials' );
 
-		foreach ( $meta_tables as $table ) {
-			foreach ( $data[ $table ] as $column => $rules ) {
-				foreach ( $this->make_config( $data )->rules( $table, $column ) as $index => $rule ) {
-					$this->assertNotNull( $rule->get_constraint_values(), "credentials.php {$table}.{$column}[{$index}] is limited to a list of values, not a regular expression." );
+		foreach ( array( 'credentials', 'credentials-easy-digital-downloads' ) as $file ) {
+			$data = $this->config_file( $file );
+
+			foreach ( array_intersect( $meta_tables, array_keys( $data ) ) as $table ) {
+				foreach ( $data[ $table ] as $column => $rules ) {
+					foreach ( $this->make_config( $data )->rules( $table, $column ) as $index => $rule ) {
+						$this->assertNotNull( $rule->get_constraint_values(), "{$file}.php {$table}.{$column}[{$index}] is limited to a list of values, not a regular expression." );
+					}
 				}
 			}
 		}
+	}
+
+	public function test_credentials_php_has_no_easy_digital_downloads_rules() {
+		$data = $this->config_file( 'credentials' );
+
+		// credentials.php loads on every site, so it mustn't add a usermeta.meta_value constraint.
+		$this->assertArrayNotHasKey( 'meta_key', $data['usermeta'] );
+		$this->assertStringNotContainsString( 'edd', strtolower( serialize( $data ) ) );
 	}
 }

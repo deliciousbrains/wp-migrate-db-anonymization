@@ -84,24 +84,56 @@ class LoaderTableRequirementsTest extends TestCase {
 		$config = $this->load_with_tables( array() );
 
 		$this->assertArrayHasKey( 'woocommerce_api_keys', $config );
+		$this->assertArrayHasKey( 'wc_webhooks', $config );
+		$this->assertArrayHasKey( 'usermeta', $config );
+	}
+
+	/**
+	 * @return array
+	 */
+	public static function easy_digital_downloads_table_provider() {
+		return array(
+			'customers' => array( 'edd_customers' ),
+			'orders'    => array( 'edd_orders' ),
+		);
+	}
+
+	/**
+	 * @dataProvider easy_digital_downloads_table_provider
+	 */
+	public function test_easy_digital_downloads_credentials_load_when_an_edd_table_exists( $table ) {
+		$config = $this->load_with_tables( array( $table ) );
+
 		$this->assertArrayHasKey( 'edd_licenses', $config );
+		$this->assertArrayHasKey( 'edd_logs_api_requests', $config );
 		$this->assertArrayHasKey( 'meta_key', $config['usermeta'] );
 	}
 
+	public function test_easy_digital_downloads_credentials_do_not_load_without_its_tables() {
+		$config = $this->load_with_tables( array( 'posts', 'woocommerce_order_items' ) );
+
+		$this->assertArrayNotHasKey( 'edd_licenses', $config );
+		$this->assertArrayNotHasKey( 'edd_logs_api_requests', $config );
+		$this->assertArrayNotHasKey( 'meta_key', $config['usermeta'], 'No usermeta.meta_value constraint, so the WP-CLI command can push the usermeta rules into SQL.' );
+	}
+
 	public function test_credentials_rules_can_be_turned_off() {
+		// The example from the README.
 		add_filter(
 			'wpmdb_anonymization_load_config_file',
 			function ( $load, $name ) {
-				return 'credentials' === $name ? false : $load;
+				return 0 === strpos( $name, 'credentials' ) ? false : $load;
 			},
 			10,
 			2
 		);
 
-		$config = $this->load_with_tables( array() );
+		$config = $this->load_with_tables( array( 'edd_orders' ) );
 
 		$this->assertArrayNotHasKey( 'woocommerce_api_keys', $config );
+		$this->assertArrayNotHasKey( 'edd_licenses', $config );
 		$this->assertArrayNotHasKey( 'meta_key', $config['usermeta'] );
 		$this->assertArrayHasKey( 'users', $config, 'Other files still load.' );
+		$this->assertArrayHasKey( 'edd_customers', $config, 'Other files still load.' );
 	}
 }

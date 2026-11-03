@@ -457,6 +457,46 @@ class CLITest extends TestCase {
 	}
 
 	/**
+	 * The WHERE clause of the queries that read a table's rows.
+	 *
+	 * @param string $table
+	 *
+	 * @return string[]
+	 */
+	protected function select_queries( $table ) {
+		return array_values(
+			array_filter(
+				$this->wpdb->queries,
+				function ( $sql ) use ( $table ) {
+					return 0 === strpos( $sql, "SELECT * FROM \"{$table}\"" ) || 0 === strpos( $sql, "SELECT * FROM `{$table}`" );
+				}
+			)
+		);
+	}
+
+	public function test_usermeta_is_only_filtered_by_meta_value_on_sites_with_edd_data() {
+		$this->create_usermeta_table( 'wp_usermeta' );
+
+		$this->run_command( array( 'tables' => 'usermeta' ) );
+
+		$queries = $this->select_queries( 'wp_usermeta' );
+		$this->assertNotEmpty( $queries );
+		$this->assertStringContainsString( 'meta_key', $queries[0] );
+		$this->assertStringNotContainsString( 'meta_value', $queries[0], 'Without EDD data the usermeta rules only filter on meta_key.' );
+
+		// The EDD API key rule is constrained on meta_value.
+		$this->wpdb->exec( 'CREATE TABLE wp_edd_orders ( id INTEGER PRIMARY KEY, email TEXT )' );
+		$this->wpdb->queries = array();
+		\WP_CLI::reset();
+
+		$this->run_command( array( 'tables' => 'usermeta' ) );
+
+		$queries = $this->select_queries( 'wp_usermeta' );
+		$this->assertNotEmpty( $queries );
+		$this->assertStringContainsString( 'meta_value', $queries[0] );
+	}
+
+	/**
 	 * @dataProvider valid_prefix_provider
 	 */
 	public function test_valid_prefixes( $prefix ) {

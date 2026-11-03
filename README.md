@@ -86,16 +86,19 @@ The anonymization rules live in the `config` directory, one file per plugin. Ord
 - `redirection.php` (Redirection; loaded if a `redirection_404` or `redirection_logs` table exists)
     - `redirection_404` and `redirection_logs`: IP address, user agent, referrer and request data (logged HTTP headers), replaced with an empty JSON object. The requested URL and domain are kept so the logs stay useful, so personal data in a logged URL's query string is not removed
 - `credentials.php` (always loaded; see [Credentials](#credentials))
-    - `usermeta`: application passwords, Two Factor TOTP secrets, backup codes and email tokens, Easy Digital Downloads API keys, Metorik cart tokens
-    - `postmeta` and `wc_orders_meta`: WooCommerce Print Invoice & Delivery Note guest access and PDF tokens, Metorik cart tokens, EDD 2.x API log keys and tokens, EDD Software Licensing 2.x license keys
+    - `usermeta`: application passwords, Two Factor TOTP secrets, backup codes and email tokens, Metorik cart tokens
+    - `postmeta` and `wc_orders_meta`: WooCommerce Print Invoice & Delivery Note guest access and PDF tokens, Metorik cart tokens
     - `woocommerce_api_keys`: consumer key and secret, truncated key and nonces
     - `wc_webhooks`: secret and delivery URL
+- `credentials-easy-digital-downloads.php` (loaded with `easy-digital-downloads.php`; see [Credentials](#credentials))
+    - `usermeta`: user API keys
+    - `postmeta`: EDD 2.x API log keys and tokens, EDD Software Licensing 2.x license keys
     - `edd_logs_api_requests`: API key, token and request query string
     - `edd_licenses`: license key
 
 Table names are given without the table prefix. On multisite, subsite tables such as `wp_2_postmeta` use the same rules as `wp_postmeta`.
 
-A plugin's rules are only loaded if its data is in the database, whether or not the plugin is active: WooCommerce if a `woocommerce_order_items`, `wc_orders` or `wc_customer_lookup` table exists for any site, or customer billing details remain in `usermeta`; Easy Digital Downloads if an `edd_customers` or `edd_orders` table exists. Sites without these plugins don't spend time checking their rules during a migration. The rules are loaded, and the `wpmdb_anonymization_config` filter applied, the first time they are needed during a migration rather than on every request.
+A plugin's rules are only loaded if its data is in the database, whether or not the plugin is active: WooCommerce if a `woocommerce_order_items`, `wc_orders` or `wc_customer_lookup` table exists for any site, or customer billing details remain in `usermeta`; Easy Digital Downloads (both `easy-digital-downloads.php` and `credentials-easy-digital-downloads.php`) if an `edd_customers` or `edd_orders` table exists. Sites without these plugins don't spend time checking their rules during a migration. The rules are loaded, and the `wpmdb_anonymization_config` filter applied, the first time they are needed during a migration rather than on every request.
 
 To force a plugin's rules on or off, use the `wpmdb_anonymization_load_config_file` filter:
 
@@ -120,10 +123,12 @@ API keys, tokens and secrets aren't personal data, but they give access to the l
 
 Two Factor TOTP secrets and backup codes are replaced too, so users who set up two-factor authentication on the live site, including whitelisted users, need to set it up again on the copy, or deactivate the Two Factor plugin there.
 
-To keep the original credentials, turn the file off:
+Easy Digital Downloads credentials are in a separate file, `credentials-easy-digital-downloads.php`, loaded only on sites with EDD data. EDD stores each user's API key as a `usermeta` meta key, so its rule is limited by `meta_value`, and loading it everywhere would make the WP-CLI command read every `usermeta` row on every site.
+
+To keep the original credentials, turn both files off:
 
     add_filter( 'wpmdb_anonymization_load_config_file', function ( $load, $name ) {
-        return 'credentials' === $name ? false : $load;
+        return 0 === strpos( $name, 'credentials' ) ? false : $load;
     }, 10, 2 );
 
 ### Gravity Forms field values
@@ -359,7 +364,7 @@ or to a single WP-CLI run with `--rules=/path/private-rules.php` (see [WP-CLI](#
 
 - Table names are written without the table prefix, as in the bundled files. With the WP-CLI `--prefix=''` option they are used exactly as written, so a rule for `my_backup_table` processes the table `my_backup_table`.
 - Extra files are merged with the bundled rules. If both define the same table and column, both sets of rules are kept, bundled rules first, and each value uses the first rule whose constraint matches. Rules with different constraints, such as different `meta_key` values, therefore all apply. To replace a bundled rule for the same rows, change it with the `wpmdb_anonymization_config` filter instead.
-- Extra files have no requirements, so they are always loaded. The `wpmdb_anonymization_load_config_file` filter receives their file name without `.php` (e.g. `private-rules`) and can turn them off. Don't name a file after a bundled one (`wordpress.php`, `woocommerce.php`, `easy-digital-downloads.php`), or that file's requirements apply to it.
+- Extra files have no requirements, so they are always loaded. The `wpmdb_anonymization_load_config_file` filter receives their file name without `.php` (e.g. `private-rules`) and can turn them off. Don't name a file after a bundled one (such as `wordpress.php`, `woocommerce.php` or `easy-digital-downloads.php`), or that file's requirements apply to it.
 - The file should only return an array, without declaring functions or classes: the WP-CLI command includes it once to check it before the rules are loaded. Paths that aren't files are skipped by the filter; `--rules` reports them as an error.
 
 ## Development

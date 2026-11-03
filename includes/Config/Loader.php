@@ -110,21 +110,26 @@ class Loader {
 	 */
 	protected function requirements() {
 		return array(
-			'woocommerce'            => array(
+			'woocommerce'                        => array(
 				'tables'   => array( 'woocommerce_order_items', 'wc_orders', 'wc_customer_lookup' ),
 				// Customer addresses in usermeta are kept when WooCommerce is uninstalled.
 				'callback' => function ( $wpdb ) {
 					return (bool) $wpdb->get_var( "SELECT 1 FROM {$wpdb->usermeta} WHERE meta_key IN ( 'billing_email', 'billing_first_name', 'shipping_first_name' ) LIMIT 1" );
 				},
 			),
-			'easy-digital-downloads' => array(
+			'easy-digital-downloads'             => array(
 				'tables' => array( 'edd_customers', 'edd_orders' ),
 			),
-			'gravity-forms'          => array(
+			// As easy-digital-downloads. Its rule constrained on usermeta.meta_value makes
+			// the WP-CLI command read every usermeta row, so it mustn't load everywhere.
+			'credentials-easy-digital-downloads' => array(
+				'tables' => array( 'edd_customers', 'edd_orders' ),
+			),
+			'gravity-forms'                      => array(
 				// Gravity Forms 2.x, or 1.x tables left after upgrading.
 				'tables' => array( 'gf_entry', 'gf_form', 'rg_lead' ),
 			),
-			'redirection'            => array(
+			'redirection'                        => array(
 				'tables' => array( 'redirection_404', 'redirection_logs' ),
 			),
 		);
