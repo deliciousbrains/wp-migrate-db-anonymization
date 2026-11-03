@@ -62,4 +62,25 @@ class RuleLikePatternsTest extends TestCase {
 		$rule->load( array( 'constraint' => array( 'meta_key' => 'billing_email' ), 'fake_data_type' => 'email' ) );
 		$this->assertNull( $rule->get_constraint_like_patterns() );
 	}
+
+	public function test_multi_column_rule_returns_patterns_for_the_first_convertible_regex() {
+		// The first regex can't be converted, the second can.
+		$rule = new Rule( 'postmeta', 'meta_value' );
+		$rule->load( array( 'constraint' => array( 'meta_value' => array( 'regex' => '/^(?!public$)/' ), 'meta_key' => array( 'regex' => '/^_edd_log_(key|token)$/' ) ), 'fake_data_type' => 'md5' ) );
+		$this->assertSame( array( 'meta_key', array( '!_edd!_log!_key', '!_edd!_log!_token' ) ), $rule->get_constraint_like_patterns() );
+
+		$rule = new Rule( 'postmeta', 'meta_value' );
+		$rule->load( array( 'constraint' => array( 'meta_key' => array( 'regex' => '/_stripe_customer_id$/' ), 'meta_value' => array( 'regex' => '/^cus_/' ) ), 'fake_data_type' => 'ean13' ) );
+		$this->assertSame( array( 'meta_key', array( '%!_stripe!_customer!_id' ) ), $rule->get_constraint_like_patterns() );
+
+		// Another column has exact values, which get_constraint_values() pushes down instead.
+		$rule = new Rule( 'postmeta', 'meta_value' );
+		$rule->load( array( 'constraint' => array( 'meta_value' => array( 'regex' => '/^cus_/' ), 'meta_key' => 'customer_email' ), 'fake_data_type' => 'email' ) );
+		$this->assertNull( $rule->get_constraint_like_patterns() );
+
+		// No regex can be converted.
+		$rule = new Rule( 'postmeta', 'meta_value' );
+		$rule->load( array( 'constraint' => array( 'meta_key' => array( 'regex' => '/^tel-\d+$/' ), 'meta_value' => array( 'regex' => '/@/i' ) ), 'fake_data_type' => 'email' ) );
+		$this->assertNull( $rule->get_constraint_like_patterns() );
+	}
 }

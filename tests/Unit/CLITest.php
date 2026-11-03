@@ -56,6 +56,21 @@ class CLITest extends TestCase {
 	}
 
 	/**
+	 * Write a temporary rules file returning the given PHP array expression.
+	 *
+	 * @param string $php_array
+	 *
+	 * @return string Path.
+	 */
+	protected function write_rules_file( $php_array ) {
+		$file               = tempnam( sys_get_temp_dir(), 'wpmdba-rules' );
+		$this->temp_files[] = $file;
+		file_put_contents( $file, '<?php return ' . $php_array . ';' );
+
+		return $file;
+	}
+
+	/**
 	 * Assert that a callback stops the command with an error.
 	 *
 	 * @param string   $message_fragment
@@ -142,6 +157,34 @@ class CLITest extends TestCase {
 		$this->assertNotSame( 'cus_real2', $rows['2']->meta_value );
 		$this->assertSame( 'keep-me', $rows['3']->meta_value );
 		$this->assertSame( 'en_GB', $rows['4']->meta_value );
+	}
+
+	public function test_multi_column_constraint_pushes_one_column_into_sql_and_checks_the_other_per_row() {
+		$this->wpdb->exec( 'CREATE TABLE "site_meta" ( meta_id INTEGER PRIMARY KEY, meta_key TEXT, meta_value TEXT )' );
+		$this->wpdb->exec( "INSERT INTO \"site_meta\" VALUES ( 1, 'customer_email', 'alice@real.test' ), ( 2, 'customer_email', 'n/a' ), ( 3, 'other_email', 'bob@real.test' ), ( 4, 'locale', 'en_GB' ), ( 5, 'customer_email', 'carol@real.test' )" );
+
+		$file = $this->write_rules_file( "array( 'site_meta' => array( 'meta_value' => array( array( 'constraint' => array( 'meta_key' => 'customer_email', 'meta_value' => array( 'regex' => '/@/' ) ), 'fake_data_type' => 'email' ) ) ) )" );
+
+		$this->run_command( array( 'prefix' => '', 'rules' => $file, 'tables' => 'site_meta' ) );
+
+		$this->assertSame( array( 'site_meta' ), $this->summary_tables() );
+		// Only the three customer_email rows are read, by meta_key.
+		$this->assertSame( 3, (int) \WP_CLI::$items[0]['scanned'] );
+		$this->assertSame( 2, (int) \WP_CLI::$items[0]['changed'] );
+		$selects = array_filter( $this->wpdb->queries, function ( $sql ) {
+			return 0 === strpos( $sql, 'SELECT * FROM `site_meta`' );
+		} );
+		$this->assertNotEmpty( $selects );
+		foreach ( $selects as $sql ) {
+			$this->assertStringContainsString( "`meta_key` IN ('customer_email')", $sql );
+		}
+
+		$rows = $this->wpdb->rows( 'site_meta' );
+		$this->assertMatchesPattern( self::EMAIL_PATTERN, $rows['1']->meta_value );
+		$this->assertSame( 'n/a', $rows['2']->meta_value, 'The meta_value regex is still applied to each row.' );
+		$this->assertSame( 'bob@real.test', $rows['3']->meta_value );
+		$this->assertSame( 'en_GB', $rows['4']->meta_value );
+		$this->assertMatchesPattern( self::EMAIL_PATTERN, $rows['5']->meta_value );
 	}
 
 	/**

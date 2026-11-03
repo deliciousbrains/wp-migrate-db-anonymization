@@ -139,6 +139,37 @@ class DeterministicTest extends TestCase {
 		$this->assertNull( $rule->get_constraint_values() );
 	}
 
+	public function test_multi_column_constraint_values_use_the_first_column_with_values() {
+		// valid() requires every column to match, so one column's values are a safe superset.
+		$rule = new Rule( 'postmeta', 'meta_value' );
+		$rule->load( array( 'constraint' => array( 'meta_key' => 'customer_email', 'meta_value' => array( 'regex' => '/^a:[1-9]/' ) ), 'fake_data_type' => 'email' ) );
+		$this->assertSame( array( 'meta_key', array( 'customer_email' ) ), $rule->get_constraint_values() );
+
+		$rule = new Rule( 'postmeta', 'meta_value' );
+		$rule->load( array( 'constraint' => array( 'meta_key' => array( 'in' => array( '_edd_log_key', '_edd_log_token' ) ), 'meta_value' => array( 'regex' => '/^(?!public$)/' ) ), 'fake_data_type' => 'md5' ) );
+		$this->assertSame( array( 'meta_key', array( '_edd_log_key', '_edd_log_token' ) ), $rule->get_constraint_values() );
+
+		// The regex column comes first: the next column with values is used.
+		$rule = new Rule( 'postmeta', 'meta_value' );
+		$rule->load( array( 'constraint' => array( 'meta_value' => array( 'regex' => '/@/' ), 'meta_key' => array( 'billing_email', 'shipping_email' ) ), 'fake_data_type' => 'email' ) );
+		$this->assertSame( array( 'meta_key', array( 'billing_email', 'shipping_email' ) ), $rule->get_constraint_values() );
+
+		// Both columns have values: the first in definition order wins.
+		$rule = new Rule( 'postmeta', 'meta_value' );
+		$rule->load( array( 'constraint' => array( 'post_id' => 5, 'meta_key' => 'billing_email' ), 'fake_data_type' => 'email' ) );
+		$this->assertSame( array( 'post_id', array( '5' ) ), $rule->get_constraint_values() );
+
+		// An empty list has no values to push down, so the next column is used.
+		$rule = new Rule( 'postmeta', 'meta_value' );
+		$rule->load( array( 'constraint' => array( 'meta_key' => array( 'in' => array() ), 'post_id' => array( 1, 2 ) ), 'fake_data_type' => 'email' ) );
+		$this->assertSame( array( 'post_id', array( '1', '2' ) ), $rule->get_constraint_values() );
+
+		// Only regexes: no fixed values.
+		$rule = new Rule( 'postmeta', 'meta_value' );
+		$rule->load( array( 'constraint' => array( 'meta_key' => array( 'regex' => '/_email$/' ), 'meta_value' => array( 'regex' => '/@/' ) ), 'fake_data_type' => 'email' ) );
+		$this->assertNull( $rule->get_constraint_values() );
+	}
+
 	/**
 	 * assertMatchesRegularExpression() only exists in PHPUnit 9+.
 	 *

@@ -193,23 +193,78 @@ class Rule {
 	 * A list combined with a regex still returns the list: rows must be in it
 	 * to match, and the regex is applied afterwards by valid().
 	 *
-	 * Returns null when the rule could match rows with any value in the
-	 * column (no constraint, a callback constraint, or a regex on its own).
+	 * When the constraint has several columns, valid() requires all of them to
+	 * match, so the values of any one column cover every row the rule can
+	 * match. The first column, in definition order, with exact or list values
+	 * is returned, and valid() still checks the other columns on each row.
+	 *
+	 * Returns null when the rule could match rows with any value in every
+	 * column (no constraint, a callback constraint, or only regexes).
 	 *
 	 * @return array|null array( column, array values )
 	 */
 	public function get_constraint_values() {
-		if ( ! is_array( $this->constraint ) || 1 !== count( $this->constraint ) ) {
+		if ( ! is_array( $this->constraint ) ) {
 			return null;
 		}
 
-		$expected = reset( $this->constraint );
-		$column   = key( $this->constraint );
+		foreach ( $this->constraint as $column => $expected ) {
+			if ( ! is_string( $column ) ) {
+				continue;
+			}
 
-		if ( ! is_string( $column ) ) {
+			$values = self::column_constraint_values( $expected );
+			if ( null !== $values ) {
+				return array( $column, $values );
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * The column and SQL LIKE patterns covering this rule's regex constraint,
+	 * when the regex is simple enough to convert (see regex_to_like_patterns()).
+	 * Used by the WP-CLI command so a regex-only rule (e.g. a meta key with a
+	 * site prefix) doesn't force a full table scan.
+	 *
+	 * The patterns match at least every value the regex matches; valid() still
+	 * applies the regex to each row.
+	 *
+	 * When the constraint has several columns, the patterns are for the first
+	 * column with a convertible regex. Returns null if any column has exact or
+	 * list values: get_constraint_values() covers the rule then.
+	 *
+	 * @return array|null array( column, array patterns )
+	 */
+	public function get_constraint_like_patterns() {
+		if ( ! is_array( $this->constraint ) || null !== $this->get_constraint_values() ) {
 			return null;
 		}
 
+		foreach ( $this->constraint as $column => $expected ) {
+			if ( ! is_string( $column ) || ! is_array( $expected ) || ! isset( $expected['regex'] ) || array_key_exists( 'in', $expected ) ) {
+				continue;
+			}
+
+			$patterns = self::regex_to_like_patterns( $expected['regex'] );
+			if ( null !== $patterns ) {
+				return array( $column, $patterns );
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * The fixed values one column's constraint allows, or null if it allows
+	 * any value (a regex on its own) or is empty.
+	 *
+	 * @param mixed $expected
+	 *
+	 * @return array|null
+	 */
+	protected static function column_constraint_values( $expected ) {
 		if ( is_string( $expected ) || is_int( $expected ) ) {
 			$values = array( $expected );
 		} elseif ( is_array( $expected ) && array_key_exists( 'in', $expected ) ) {
@@ -222,35 +277,7 @@ class Rule {
 
 		$values = array_values( array_unique( array_map( 'strval', array_filter( $values, 'is_scalar' ) ) ) );
 
-		return empty( $values ) ? null : array( $column, $values );
-	}
-
-	/**
-	 * The column and SQL LIKE patterns covering this rule's regex constraint,
-	 * when the regex is simple enough to convert (see regex_to_like_patterns()).
-	 * Used by the WP-CLI command so a regex-only rule (e.g. a meta key with a
-	 * site prefix) doesn't force a full table scan.
-	 *
-	 * The patterns match at least every value the regex matches; valid() still
-	 * applies the regex to each row.
-	 *
-	 * @return array|null array( column, array patterns )
-	 */
-	public function get_constraint_like_patterns() {
-		if ( ! is_array( $this->constraint ) || 1 !== count( $this->constraint ) ) {
-			return null;
-		}
-
-		$expected = reset( $this->constraint );
-		$column   = key( $this->constraint );
-
-		if ( ! is_string( $column ) || ! is_array( $expected ) || ! isset( $expected['regex'] ) || array_key_exists( 'in', $expected ) ) {
-			return null;
-		}
-
-		$patterns = self::regex_to_like_patterns( $expected['regex'] );
-
-		return null === $patterns ? null : array( $column, $patterns );
+		return empty( $values ) ? null : $values;
 	}
 
 	/**
