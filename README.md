@@ -93,7 +93,7 @@ The anonymization rules live in the `config` directory, one file per plugin. Ord
 - `credentials-easy-digital-downloads.php` (loaded with `easy-digital-downloads.php`; see [Credentials](#credentials))
     - `usermeta`: user API keys
     - `postmeta`: EDD 2.x API log keys and tokens, EDD Software Licensing 2.x license keys
-    - `edd_logs_api_requests`: API key, token and request query string
+    - `edd_logs_api_requests`: API key, token and request query string. In both API request logs, `public`, which EDD records as the key and token of a request made without an API key, is kept
     - `edd_licenses`: license key
 
 Table names are given without the table prefix. On multisite, subsite tables such as `wp_2_postmeta` use the same rules as `wp_postmeta`.

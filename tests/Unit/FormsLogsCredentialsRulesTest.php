@@ -4,6 +4,7 @@ namespace WPMDB\Anonymization\Tests\Unit;
 
 use WPMDB\Anonymization\Anonymizer;
 use WPMDB\Anonymization\Config\Loader;
+use WPMDB\Anonymization\Config\Rule;
 use WPMDB\Anonymization\Tests\Doubles\TablesWpdb;
 use WPMDB\Anonymization\Tests\TestCase;
 
@@ -223,6 +224,44 @@ class FormsLogsCredentialsRulesTest extends TestCase {
 	}
 
 	/**
+	 * @return array
+	 */
+	public static function edd_2_log_meta_key_provider() {
+		return array(
+			'key'   => array( '_edd_log_key' ),
+			'token' => array( '_edd_log_token' ),
+		);
+	}
+
+	/**
+	 * @dataProvider edd_2_log_meta_key_provider
+	 */
+	public function test_edd_2_api_request_log_meta_keeps_public_requests( $meta_key ) {
+		$anonymizer = $this->make_anonymizer( $this->credentials_config() );
+
+		$public = $this->row( array( 'post_id' => '5', 'meta_key' => $meta_key, 'meta_value' => 'public' ) );
+		$this->assertSame( 'public', $anonymizer->anonymize_value( 'postmeta', 'meta_value', $public, $public->meta_value ) );
+
+		foreach ( array( self::sample_key(), 'publicity', 'not-public' ) as $original ) {
+			$keyed = $this->row( array( 'post_id' => '6', 'meta_key' => $meta_key, 'meta_value' => $original ) );
+			$value = $anonymizer->anonymize_value( 'postmeta', 'meta_value', $keyed, $keyed->meta_value );
+
+			$this->assertMatchesRegularExpression( '/^[a-f0-9]{32}$/', $value );
+			$this->assertNotSame( $original, $value );
+		}
+	}
+
+	public function test_edd_software_licensing_2_keys_have_no_public_exception() {
+		$anonymizer = $this->make_anonymizer( $this->credentials_config() );
+
+		foreach ( array( '_edd_sl_key', '_edd_sl_renewal_key' ) as $meta_key ) {
+			$row = $this->row( array( 'post_id' => '7', 'meta_key' => $meta_key, 'meta_value' => 'public' ) );
+
+			$this->assertMatchesRegularExpression( '/^[a-f0-9]{32}$/', $anonymizer->anonymize_value( 'postmeta', 'meta_value', $row, $row->meta_value ) );
+		}
+	}
+
+	/**
 	 * Table, column, meta key (or null) and the pattern the replacement must match.
 	 *
 	 * @return array
@@ -267,8 +306,12 @@ class FormsLogsCredentialsRulesTest extends TestCase {
 
 			foreach ( array_intersect( $meta_tables, array_keys( $data ) ) as $table ) {
 				foreach ( $data[ $table ] as $column => $rules ) {
-					foreach ( $this->make_config( $data )->rules( $table, $column ) as $index => $rule ) {
-						$this->assertNotNull( $rule->get_constraint_values(), "{$file}.php {$table}.{$column}[{$index}] is limited to a list of values, not a regular expression." );
+					foreach ( isset( $rules[0] ) ? $rules : array( $rules ) as $index => $rule ) {
+						// The WP-CLI command pushes the first column of a constraint into SQL.
+						$first = new Rule( $table, $column );
+						$first->load( array( 'constraint' => array_slice( $rule['constraint'], 0, 1, true ) ) );
+
+						$this->assertNotNull( $first->get_constraint_values(), "{$file}.php {$table}.{$column}[{$index}] is limited to a list of values, not a regular expression." );
 					}
 				}
 			}

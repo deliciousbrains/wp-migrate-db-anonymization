@@ -39,9 +39,18 @@ return array(
 		'meta_value' => array(
 			array(
 				// EDD 2.x API request logs (stored as posts): the API key and token
-				// used. EDD Software Licensing before 3.6 (licenses stored as posts):
-				// the license key, and on renewal payments the key that was renewed.
-				'constraint'     => array( 'meta_key' => array( 'in' => array( '_edd_log_key', '_edd_log_token', '_edd_sl_key', '_edd_sl_renewal_key' ) ) ),
+				// used. 'public' marks a request made without a key and is kept, as
+				// in edd_logs_api_requests, to which EDD 3 migrates these logs.
+				'constraint'     => array(
+					'meta_key'   => array( 'in' => array( '_edd_log_key', '_edd_log_token' ) ),
+					'meta_value' => array( 'regex' => '/^(?!public$)/' ),
+				),
+				'fake_data_type' => 'md5',
+			),
+			array(
+				// EDD Software Licensing before 3.6 (licenses stored as posts): the
+				// license key, and on renewal payments the key that was renewed.
+				'constraint'     => array( 'meta_key' => array( 'in' => array( '_edd_sl_key', '_edd_sl_renewal_key' ) ) ),
 				'fake_data_type' => 'md5',
 			),
 		),
