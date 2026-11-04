@@ -89,7 +89,14 @@ class ShippedConfigTest extends TestCase {
 		}
 
 		if ( isset( $rule['constraint'] ) && is_array( $rule['constraint'] ) ) {
-			$this->assertCount( 1, $rule['constraint'], 'Column constraints compare a single column.' );
+			// Every column listed must match (see Rule::valid_column_constraint()).
+			$this->assertNotEmpty( $rule['constraint'], 'Column constraints name at least one column.' );
+			foreach ( $rule['constraint'] as $constraint_column => $expected ) {
+				$this->assertIsString( $constraint_column, 'Column constraints are keyed by column name.' );
+				if ( is_array( $expected ) && isset( $expected['regex'] ) ) {
+					$this->assertNotFalse( @preg_match( $expected['regex'], '' ), "Regex for {$constraint_column} compiles." );
+				}
+			}
 		}
 
 		$this->addToAssertionCount( 1 );

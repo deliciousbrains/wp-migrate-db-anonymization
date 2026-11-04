@@ -109,12 +109,6 @@ class ConfigTest extends TestCase {
 	}
 
 	public function test_clean_table_strips_multisite_subsite_prefix() {
-		$this->markTestSkipped(
-			'Known bug: Config::clean_table() only strips $wpdb->base_prefix, so multisite subsite tables such as '
-			. '"wp_2_comments" become "2_comments" and are never matched against the config. Subsite comments and '
-			. 'WooCommerce order meta are therefore not anonymized.'
-		);
-
 		$config = $this->make_config( array(), 'wp_' );
 
 		$this->assertSame( 'comments', $config->clean_table( 'wp_2_comments' ) );
