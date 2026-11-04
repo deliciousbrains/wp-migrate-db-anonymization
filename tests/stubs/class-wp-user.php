@@ -20,9 +20,18 @@ if ( ! class_exists( 'WP_User' ) ) {
 		public $ID = 0;
 
 		/**
+		 * How many instances have been built, so tests can check the plugin
+		 * avoids building them when it doesn't need to.
+		 *
+		 * @var int
+		 */
+		public static $constructed = 0;
+
+		/**
 		 * @param int|object|WP_User $id
 		 */
 		public function __construct( $id = 0 ) {
+			self::$constructed++;
 			if ( $id instanceof WP_User ) {
 				$id = $id->data;
 			}

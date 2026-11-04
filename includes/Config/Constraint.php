@@ -56,24 +56,44 @@ class Constraint {
 			return true;
 		}
 
-		$user = new \WP_User( $row );
+		// A users row has several anonymized columns and each one is checked, so
+		// reuse the answer for the same row rather than working it out again.
+		if ( null !== self::$last_check && self::$last_check[0] === $row ) {
+			return self::$last_check[1];
+		}
 
-		return ! self::is_whitelisted_user( $user );
+		$not_whitelisted  = ! self::is_whitelisted_row( $row );
+		self::$last_check = array( $row, $not_whitelisted );
+
+		return $not_whitelisted;
 	}
 
 	/**
-	 * @param \WP_User $user
+	 * The last row checked by is_not_whitelisted_user() and its result.
+	 *
+	 * @var array|null array( object $row, bool $not_whitelisted )
+	 */
+	protected static $last_check = null;
+
+	/**
+	 * @param object $row A users table row.
 	 *
 	 * @return bool
 	 */
-	protected static function is_whitelisted_user( $user ) {
+	protected static function is_whitelisted_row( $row ) {
 		$whitelisted = false;
 		if ( defined( 'WPMDB_ANONYMIZATION_USER_LOGIN_WHITELIST' ) ) {
 			$whitelisted_user_logins = array_map( 'trim', explode( ',', WPMDB_ANONYMIZATION_USER_LOGIN_WHITELIST ) );
 
-			$whitelisted = in_array( $user->user_login, $whitelisted_user_logins );
+			$whitelisted = in_array( $row->user_login, $whitelisted_user_logins );
 		}
 
-		return (bool) apply_filters( 'wpmdb_anonymization_user_whitelisted', $whitelisted, $user );
+		// Building a WP_User loads the user's meta from the database, which makes
+		// large users tables crawl. Only do it when a callback needs the user.
+		if ( ! function_exists( 'has_filter' ) || ! has_filter( 'wpmdb_anonymization_user_whitelisted' ) ) {
+			return $whitelisted;
+		}
+
+		return (bool) apply_filters( 'wpmdb_anonymization_user_whitelisted', $whitelisted, new \WP_User( $row ) );
 	}
 }

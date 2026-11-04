@@ -60,6 +60,45 @@ class ConstraintTest extends TestCase {
 		$this->assertTrue( Constraint::is_not_whitelisted_user( $other ) );
 	}
 
+	public function test_no_wp_user_is_built_without_a_whitelist_filter() {
+		$before = \WP_User::$constructed;
+
+		for ( $i = 1; $i <= 50; $i++ ) {
+			$this->assertTrue( Constraint::is_not_whitelisted_user( $this->row( array( 'ID' => (string) $i, 'user_login' => "user{$i}" ) ) ) );
+		}
+
+		$this->assertSame( $before, \WP_User::$constructed, 'Without a filter the login is compared directly.' );
+	}
+
+	public function test_each_row_is_checked_once_across_its_columns() {
+		$calls = 0;
+		add_filter(
+			'wpmdb_anonymization_user_whitelisted',
+			function ( $whitelisted, $user ) use ( &$calls ) {
+				$calls++;
+
+				return 'keep' === $user->user_login;
+			},
+			10,
+			2
+		);
+
+		$kept  = $this->row( array( 'ID' => '1', 'user_login' => 'keep' ) );
+		$other = $this->row( array( 'ID' => '2', 'user_login' => 'other' ) );
+		$before = \WP_User::$constructed;
+
+		// One check per anonymized column of the same row.
+		for ( $column = 0; $column < 6; $column++ ) {
+			$this->assertFalse( Constraint::is_not_whitelisted_user( $kept ) );
+		}
+		for ( $column = 0; $column < 6; $column++ ) {
+			$this->assertTrue( Constraint::is_not_whitelisted_user( $other ) );
+		}
+
+		$this->assertSame( 2, $calls, 'The filter runs once per row.' );
+		$this->assertSame( $before + 2, \WP_User::$constructed, 'One WP_User per row.' );
+	}
+
 	/**
 	 * @runInSeparateProcess
 	 * @preserveGlobalState disabled
