@@ -20,7 +20,7 @@ When the plugin is activated it will anonymize by default. You will need to deac
 
 To preserve specific rows in the users table, use the `WPMDB_ANONYMIZATION_USER_LOGIN_WHITELIST` constant to set a whitelist of comma separated user logins.
 
-To replace all passwords with a hashed default password, set the password using the `WPMDB_ANONYMIZATION_DEFAULT_PASSWORD` constant.
+Passwords are replaced with a single hash per export or run, shared by every anonymized user: hashing is deliberately slow, so hashing a different password for each user would make large users tables crawl. Without a default password, nobody knows the shared password, so anonymized users can't log in. To give them all a password you know instead, set it using the `WPMDB_ANONYMIZATION_DEFAULT_PASSWORD` constant.
 
 These constants should be defined in the site's wp-config.php file, for example:
 
@@ -117,6 +117,100 @@ A rule's `constraint` can limit it to rows where another column has a particular
 
 If a constraint lists several columns, all of them must match.
 
+## WP-CLI
+
+The `wp migrate-anonymize run` command anonymizes the current database in place, using the same rules as exports, pushes and pulls. WP Migrate doesn't need to be active, so you can use it on a database restored from a backup, straight after importing it locally.
+
+**This permanently overwrites data. Only run it on a copy of a database, never on a live site.**
+
+    # Report how many rows would change, without writing anything
+    wp migrate-anonymize run --dry-run
+
+    # Anonymize every configured table
+    wp migrate-anonymize run --yes
+
+    # Only some tables, with a secret for deterministic output (see below)
+    wp migrate-anonymize run --tables=users,usermeta --secret="$ANONYMIZATION_SECRET" --yes
+
+    # Add private rules kept outside the plugin (see "Private rule files" below)
+    wp migrate-anonymize run --rules=/path/private-rules.php --yes
+
+    # A second WordPress install in the same database, using the shop_ prefix
+    wp migrate-anonymize run --prefix=shop_ --yes
+
+    # Unprefixed tables, named exactly as in the rules, e.g. my_backup_table
+    wp migrate-anonymize run --prefix='' --rules=/path/private-rules.php --tables=my_backup_table --yes
+
+Options:
+
+- `--tables=<tables>`: comma-separated config tables, without the table prefix (`users`, `usermeta`, `comments`, `postmeta`, plus any added with the `wpmdb_anonymization_config` filter or a rules file). Defaults to all of them.
+- `--prefix=<prefix>`: process the tables with this prefix instead of the site's `$table_prefix`, for example a second WordPress install in the same database or plugin tables without the WordPress prefix. `--prefix=''` means no prefix: table names are used exactly as written in the rules, so a rule for `my_backup_table` processes the `my_backup_table` table. The prefix may only contain letters, digits and underscores. It is treated as a single site: multisite subsites aren't processed, and the global `users` and `usermeta` tables use this prefix too. The checks for which plugins' data exists (e.g. WooCommerce tables) also use it.
+- `--rules=<files>`: comma-separated paths to extra [rule files](#private-rule-files), added to the bundled rules for this run. The command stops with an error if a file doesn't exist or doesn't return an array.
+- `--secret=<secret>`: enables [deterministic anonymization](#deterministic-anonymization). Takes precedence over the constant and filter.
+- `--batch-size=<number>`: rows fetched per query. Default `1000`.
+- `--dry-run`: count the rows that would change and write nothing.
+- `--yes`: skip the confirmation prompt.
+- `--force`: allow running when `wp_get_environment_type()` is `production`. Without it the command refuses.
+
+Example output:
+
+    Deterministic mode: the same original value always becomes the same fake value.
+    Anonymizing wp_usermeta  100% [24/24]
+    Anonymizing wp_postmeta  100% [13/13]
+    Anonymizing wp_users     100% [4/4]
+    Anonymizing wp_comments  100% [2/2]
+    +-------------+---------+---------+--------+
+    | table       | scanned | changed | errors |
+    +-------------+---------+---------+--------+
+    | wp_usermeta | 24      | 20      | 0      |
+    | wp_postmeta | 13      | 13      | 0      |
+    | wp_users    | 4       | 3       | 0      |
+    | wp_comments | 2       | 2       | 0      |
+    +-------------+---------+---------+--------+
+    Success: Anonymized 38 row(s).
+
+How it works:
+
+- Rows are read in batches ordered by primary key and changed values are written back row by row, one transaction per batch. Tables without a single-column primary key are skipped with a warning.
+- Rules on a table's primary-key column are skipped with a warning: rows are read in key order, so changing the keys would skip or repeat rows. If the keys themselves are personal data, empty such tables instead.
+- When every rule for a table is limited to specific values of a column, as with the `meta_key` rules for `usermeta` and `postmeta`, only those rows are read (`WHERE meta_key IN (...)`) instead of the whole table.
+- A simple regex constraint, such as a meta key suffix, is read with `LIKE` patterns instead. A regex ending in `$` also matches a value ending in a newline, as it does in PHP, so those rows are read too. A constraint on several columns is pushed down by one of them, the first with exact values or a list, otherwise the first simple regex; the other columns are still checked on each row.
+- The user whitelist constant and filter are respected, and empty values are left empty.
+- On multisite, `users` and `usermeta` are processed once and the other tables are processed for every site, unless `--prefix` is given.
+- The object cache is flushed afterwards.
+- If any row can't be updated, or a query to read a table fails, the command still prints the summary, then exits with an error (non-zero status) saying the database is not fully anonymized. A failed read stops that table and is counted in `errors`; the other tables are still processed. If a batch can't be committed, it is rolled back and its rows are counted in `errors`, not `changed`. A dry run with a failed read also exits with an error.
+- If checking whether a table exists fails, the command stops with an error before changing anything.
+
+Run it once per database. Running it again anonymizes the already fake values, which then no longer match values anonymized from the original data.
+
+## Deterministic anonymization
+
+By default every fake value is random, so the same email address becomes a different fake address in each table and row. That breaks joins and distinct counts on the anonymized data.
+
+Fake email addresses, user names, domain names and URLs are unique in both modes, so columns with a unique index, such as a newsletter plugin's subscriber email or EDD Software Licensing's activation sites, don't break on large databases. Email addresses and user names look like `kshlerin.rosalind.3f9a0c1b2d4e@example.com`: a Faker user name, a 12-character hex fragment and, for email addresses, the reserved `example.com` domain. Domain names and URLs are subdomains of `example.com`, e.g. `schaden-3f9a0c1b2d4e.example.com` and `https://schaden-3f9a0c1b2d4e.example.com/`, so they never point at a real site. Without a secret the fragment is random (from `random_bytes()`); with one it comes from the HMAC described below. Hash-shaped values from the `md5`, `sha1`, `sha256` and `uuid` formatters, such as licence keys and tokens, are unique too: they are built from `random_bytes()` without a secret, or from a keyed hash of the original value with one, rather than by Faker. Other values, such as names and cities, are not made unique and can repeat in random mode, just as they do in real data.
+
+Configure a secret to make anonymization deterministic, in wp-config.php:
+
+    define( 'WPMDB_ANONYMIZATION_SECRET', 'a-long-random-string' );
+
+or with the `--secret` option of the WP-CLI command, or with a filter, for example to read it from an environment variable:
+
+    add_filter( 'wpmdb_anonymization_secret', function ( $secret ) {
+        return getenv( 'WPMDB_ANONYMIZATION_SECRET' ) ?: $secret;
+    } );
+
+With a secret, each fake value is generated by seeding Faker from an HMAC-SHA256 of the original value, keyed by the secret. This applies to WP-CLI runs and to WP Migrate exports, pushes and pulls:
+
+- The same original value always becomes the same fake value, in every table, row and run that uses the same secret. For example, a customer's email address in `users.user_email`, the `billing_email` user meta and the `_billing_email` order meta all become the same fake address, so joins and `COUNT(DISTINCT ...)` give the same answers as on the original data.
+- Email addresses, user names and domain names are trimmed and lower-cased first, so `Alice@Example.org` and `alice@example.org` map to the same fake value. Other values are only trimmed.
+- Fake email addresses, user names, domain names and URLs include a 12-character fragment of the HMAC so different originals don't collide, e.g. `kshlerin.rosalind.3f9a0c1b2d4e@example.com`. Fake email addresses always use the reserved `example.com` domain.
+- Fake `md5`, `sha1`, `sha256` and `uuid` values are taken directly from a second HMAC-SHA256 of the original value rather than from Faker, so different originals don't collide and the same licence key gets the same fake key in every table, such as EDD's licences table and the `_edd_sl_key` post meta.
+- Empty values stay empty. Passwords are never deterministic.
+
+**Keep the secret private.** Use a long random value, don't commit it to version control and don't share it with the anonymized database. Anyone who has the secret can test guesses: they can anonymize a candidate value, such as a known email address, and check whether the result appears in the data. Without the secret, the fake values can't be linked back to the originals.
+
+The fake values come from Faker, so upgrading Faker or changing its locale can change the readable part of a value (the hash fragment in email addresses, user names, domain names and URLs, and hash-shaped values, stay the same). To join or compare datasets, anonymize them with the same secret and plugin version. Faker formatters that are relative to the current date, such as `dateTimeThisYear`, will also change over time.
+
 ## Extending
 
 The rules for anonymization can be extended using the `wpmdb_anonymization_config` filter, added to a plugin or mu-plugin file:
@@ -160,13 +254,53 @@ If you need to pass arguments to the Faker data method then you can define this 
     
     add_filter( 'wpmdb_anonymization_config', 'my_wpmdb_anonymization_rules' );
 
+### Private rule files
+
+Rules you'd rather not put in a plugin, for example for a custom table, can live in a plain PHP file that returns an array in the same format as the bundled `config/*.php` files:
+
+    <?php
+    // private-rules.php
+    return array(
+        'my_backup_table' => array(
+            'email'     => array(
+                'fake_data_type' => 'email',
+            ),
+            'full_name' => array(
+                'fake_data_type' => 'name',
+            ),
+        ),
+        'usermeta'        => array(
+            'meta_value' => array(
+                array(
+                    'constraint'     => array( 'meta_key' => 'private_phone' ),
+                    'fake_data_type' => 'phoneNumber',
+                ),
+            ),
+        ),
+    );
+
+Add it to every export, push and pull with the `wpmdb_anonymization_config_files` filter, which receives the absolute paths of the rule files to load, bundled files first:
+
+    add_filter( 'wpmdb_anonymization_config_files', function ( $files ) {
+        $files[] = WP_CONTENT_DIR . '/private-rules.php';
+
+        return $files;
+    } );
+
+or to a single WP-CLI run with `--rules=/path/private-rules.php` (see [WP-CLI](#wp-cli)).
+
+- Table names are written without the table prefix, as in the bundled files. With the WP-CLI `--prefix=''` option they are used exactly as written, so a rule for `my_backup_table` processes the table `my_backup_table`.
+- Extra files are merged with the bundled rules. If both define the same table and column, both sets of rules are kept, bundled rules first, and each value uses the first rule whose constraint matches. Rules with different constraints, such as different `meta_key` values, therefore all apply. To replace a bundled rule for the same rows, change it with the `wpmdb_anonymization_config` filter instead.
+- Extra files have no requirements, so they are always loaded. The `wpmdb_anonymization_load_config_file` filter receives their file name without `.php` (e.g. `private-rules`) and can turn them off. Don't name a file after a bundled one (`wordpress.php`, `woocommerce.php`, `easy-digital-downloads.php`), or that file's requirements apply to it.
+- The file should only return an array, without declaring functions or classes: the WP-CLI command includes it once to check it before the rules are loaded. Paths that aren't files are skipped by the filter; `--rules` reports them as an error.
+
 ## Development
 
 Install the development dependencies with `composer install`.
 
 ### Running tests
 
-The unit tests use PHPUnit and run without a WordPress install. The small set of WordPress functions and classes the plugin uses (`apply_filters()`, `wp_hash_password()`, `WP_User`, `wpdb` and so on) are stubbed in `tests/stubs/`.
+The unit tests use PHPUnit and run without a WordPress install. The small set of WordPress functions and classes the plugin uses (`apply_filters()`, `wp_hash_password()`, `WP_User`, `wpdb` and so on) are stubbed in `tests/stubs/`, as is the WP-CLI API. The WP-CLI command tests run against an in-memory SQLite database, so they need the `pdo_sqlite` extension.
 
     composer test
 

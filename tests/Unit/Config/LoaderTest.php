@@ -5,6 +5,7 @@ namespace WPMDB\Anonymization\Tests\Unit\Config;
 use WPMDB\Anonymization\Config\Loader;
 use WPMDB\Anonymization\Tests\Doubles\FakerSpy;
 use WPMDB\Anonymization\Tests\Doubles\InspectableConfig;
+use WPMDB\Anonymization\Tests\Doubles\SqliteWpdb;
 use WPMDB\Anonymization\Tests\TestCase;
 
 class LoaderTest extends TestCase {
@@ -141,5 +142,127 @@ class LoaderTest extends TestCase {
 		foreach ( $config->rules( 'users', 'user_email' ) as $rule ) {
 			$this->assertIsString( $rule->anonymize( $this->make_faker() ) );
 		}
+	}
+
+	/**
+	 * @param array $files
+	 */
+	protected function add_config_files( array $files ) {
+		add_filter(
+			'wpmdb_anonymization_config_files',
+			function ( $config_files ) use ( $files ) {
+				return array_merge( $config_files, $files );
+			}
+		);
+	}
+
+	/**
+	 * @return string
+	 */
+	protected function private_rules_file() {
+		return WPMDB_ANONYMIZATION_TESTS_DIR . '/fixtures/rules/private-rules.php';
+	}
+
+	public function test_config_files_filter_receives_bundled_files() {
+		$received = null;
+		add_filter(
+			'wpmdb_anonymization_config_files',
+			function ( $files ) use ( &$received ) {
+				$received = $files;
+
+				return $files;
+			}
+		);
+
+		$this->make_loader( 'plugin-merge' )->load( $this->make_wpdb() );
+
+		$dir = WPMDB_ANONYMIZATION_TESTS_DIR . '/fixtures/plugin-merge/config/';
+		$this->assertSame( array( $dir . 'a-core.php', $dir . 'b-extension.php' ), $received );
+	}
+
+	public function test_config_files_filter_adds_rules_merged_with_bundled_rules() {
+		$this->add_config_files( array( $this->private_rules_file() ) );
+
+		$config = $this->make_loader( 'plugin-merge' )->init( $this->make_inspectable_config() );
+
+		$this->assertTrue( $config->has_column( 'my_backup_table', 'email' ) );
+		$this->assertTrue( $config->has_column( 'users', 'user_email' ), 'Bundled rules are kept.' );
+
+		$data = $config->data();
+		$this->assertCount( 3, $data['usermeta']['meta_value'], 'Rules for the same column from both files apply.' );
+		$this->assertSame( array( 'meta_key' => 'first_name' ), $data['usermeta']['meta_value'][0]['constraint'] );
+		$this->assertSame( array( 'meta_key' => 'billing_phone' ), $data['usermeta']['meta_value'][1]['constraint'] );
+		$this->assertSame( array( 'meta_key' => 'private_phone' ), $data['usermeta']['meta_value'][2]['constraint'] );
+	}
+
+	public function test_extra_files_load_without_requirements_while_unmet_bundled_files_do_not() {
+		$this->add_config_files( array( $this->private_rules_file() ) );
+
+		// An empty database: no WooCommerce or Easy Digital Downloads data.
+		$data = ( new Loader( WPMDB_ANONYMIZATION_PLUGIN_FILE ) )->load( new SqliteWpdb() );
+
+		$this->assertArrayHasKey( 'my_backup_table', $data );
+		$this->assertArrayHasKey( 'users', $data );
+		$this->assertArrayNotHasKey( 'wc_orders', $data );
+		$this->assertArrayNotHasKey( 'edd_customers', $data );
+
+		$shipped        = self::shipped_config_files();
+		$expected_rules = count( $shipped['wordpress.php']['usermeta']['meta_value'] ) + 1;
+		$this->assertCount( $expected_rules, $data['usermeta']['meta_value'] );
+	}
+
+	public function test_load_config_file_filter_can_skip_an_extra_file() {
+		$this->add_config_files( array( $this->private_rules_file() ) );
+		$received = array();
+		add_filter(
+			'wpmdb_anonymization_load_config_file',
+			function ( $load, $name, $file ) use ( &$received ) {
+				$received[ $name ] = $file;
+
+				return 'private-rules' === $name ? false : $load;
+			},
+			10,
+			3
+		);
+
+		$data = $this->make_loader( 'plugin-merge' )->load( $this->make_wpdb() );
+
+		$this->assertSame( $this->private_rules_file(), $received['private-rules'] );
+		$this->assertArrayNotHasKey( 'my_backup_table', $data );
+	}
+
+	public function test_config_files_filter_skips_missing_duplicate_and_invalid_entries() {
+		$this->add_config_files(
+			array(
+				$this->private_rules_file(),
+				$this->private_rules_file(),
+				WPMDB_ANONYMIZATION_TESTS_DIR . '/fixtures/rules/does-not-exist.php',
+				WPMDB_ANONYMIZATION_TESTS_DIR . '/fixtures/rules',
+				'',
+				42,
+				null,
+			)
+		);
+
+		$data = $this->make_loader( 'plugin-merge' )->load( $this->make_wpdb() );
+
+		$this->assertCount( 3, $data['usermeta']['meta_value'], 'A file added twice is only loaded once.' );
+		$this->assertArrayHasKey( 'my_backup_table', $data );
+	}
+
+	public function test_extra_file_that_does_not_return_an_array_is_ignored() {
+		$this->add_config_files( array( WPMDB_ANONYMIZATION_TESTS_DIR . '/fixtures/rules/not-an-array.php' ) );
+
+		$data = $this->make_loader( 'plugin-merge' )->load( $this->make_wpdb() );
+
+		$this->assertSame( array( 'users', 'usermeta', 'postmeta' ), array_keys( $data ) );
+	}
+
+	public function test_non_array_config_files_filter_result_keeps_bundled_files() {
+		add_filter( 'wpmdb_anonymization_config_files', '__return_false' );
+
+		$data = $this->make_loader( 'plugin-merge' )->load( $this->make_wpdb() );
+
+		$this->assertSame( array( 'users', 'usermeta', 'postmeta' ), array_keys( $data ) );
 	}
 }

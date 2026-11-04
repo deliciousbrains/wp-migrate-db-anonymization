@@ -29,6 +29,7 @@ jobs:
         with:
           php-version: ${{ matrix.php }}
           coverage: none
+          extensions: pdo_sqlite
           tools: composer:v2
 
       - name: Validate composer.json

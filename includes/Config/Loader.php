@@ -68,7 +68,7 @@ class Loader {
 	 * @return array
 	 */
 	protected function load_files( $wpdb ) {
-		$files        = glob( $this->config_files_dir . '*.php' );
+		$files        = $this->config_files();
 		$requirements = $this->requirements();
 
 		$config_array = array();
@@ -180,6 +180,44 @@ class Loader {
 	 */
 	protected function include_file() {
 		return include func_get_arg( 0 );
+	}
+
+	/**
+	 * The rule files to load: the bundled config/*.php files followed by any
+	 * added with the `wpmdb_anonymization_config_files` filter.
+	 *
+	 * @return array Absolute paths.
+	 */
+	protected function config_files() {
+		$bundled = glob( $this->config_files_dir . '*.php' );
+		$bundled = is_array( $bundled ) ? $bundled : array();
+
+		/**
+		 * Filter the rule files to load, e.g. to add a file of private rules kept
+		 * outside the plugin. Each file returns an array in the same format as the
+		 * bundled config/*.php files and is merged with them, so a column defined
+		 * in several files gets the rules from all of them.
+		 *
+		 * Requirements are looked up by file name, so an extra file is always
+		 * loaded unless the `wpmdb_anonymization_load_config_file` filter says
+		 * otherwise (or it shares a name with a bundled file, e.g. woocommerce.php,
+		 * and so its requirements). Paths that aren't files are skipped.
+		 *
+		 * @param array $files Absolute paths of the rule files, bundled files first.
+		 */
+		$files = apply_filters( 'wpmdb_anonymization_config_files', $bundled );
+		if ( ! is_array( $files ) ) {
+			return $bundled;
+		}
+
+		$valid = array();
+		foreach ( $files as $file ) {
+			if ( is_string( $file ) && '' !== $file && is_file( $file ) && ! in_array( $file, $valid, true ) ) {
+				$valid[] = $file;
+			}
+		}
+
+		return $valid;
 	}
 
 	/**

@@ -15,10 +15,13 @@ abstract class TestCase extends PHPUnitTestCase {
 	protected function setUp(): void {
 		parent::setUp();
 		wpmdb_anonymization_tests_reset_hooks();
+		wpmdb_anonymization_tests_set_environment_type( 'local' );
+		\WPMDB\Anonymization\Config\Replacement::reset_password_cache();
 	}
 
 	protected function tearDown(): void {
 		wpmdb_anonymization_tests_reset_hooks();
+		wpmdb_anonymization_tests_set_environment_type( 'local' );
 		parent::tearDown();
 	}
 

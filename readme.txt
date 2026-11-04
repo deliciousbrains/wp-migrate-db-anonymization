@@ -35,6 +35,14 @@ To replace all passwords with a hashed default password, set the password using 
 
 The configuration rules can be extended with a filter. [Learn how](https://github.com/deliciousbrains/wp-migrate-db-anonymization#extending).
 
+= WP-CLI =
+
+Anonymize the current database in place with `wp migrate-anonymize run`, using the same rules. WP Migrate doesn't need to be active, so it works on a database restored from a backup. It permanently overwrites data, so only run it on a copy of a database. Use `--dry-run` to see what would change, `--tables=users,usermeta` to limit the tables, `--rules=/path/private-rules.php` to add private rules from a file in the same format as the bundled ones, `--prefix=shop_` to process tables with another prefix (`--prefix=''` for table names exactly as in the rules) and `--yes` to skip the confirmation. It refuses to run when the environment type is `production` unless you pass `--force`. [Learn more](https://github.com/deliciousbrains/wp-migrate-db-anonymization#wp-cli).
+
+= Deterministic anonymization =
+
+Set a secret with the `WPMDB_ANONYMIZATION_SECRET` constant, the `wpmdb_anonymization_secret` filter or the `--secret` CLI option, and the same original value always becomes the same fake value across tables, rows and runs, so joins and distinct counts still work on the anonymized data. Fake email addresses, user names, domain names and URLs include a hash fragment so they don't collide. Without a secret they get a random fragment in the same format, so they are unique either way. Keep the secret private: anyone with it can test guesses against the fake values. [Learn more](https://github.com/deliciousbrains/wp-migrate-db-anonymization#deterministic-anonymization).
+
 == Installation ==
 
 1. Use WordPress' built-in installer
@@ -51,6 +59,9 @@ The configuration rules can be extended with a filter. [Learn how](https://githu
 * Bug Fix: Fatal error instead of a notice when the vendor directory is missing
 * Improvement: Anonymize WooCommerce HPOS orders, customer lookup, payment tokens, downloads and sessions, Easy Digital Downloads 3 customers, orders and logs, and comment user agents; only load a plugin's rules when its data is in the database (#27); match multisite subsite tables (#28); support list and regex column constraints (#19)
 * Improvement: Anonymize pending email changes and signup IP addresses in user meta; WooCommerce order attribution user agents, VAT numbers, PayPal Express and Stripe card IDs, PayPal token emails, coupon email restrictions and back in stock sign-ups; Easy Digital Downloads customer and subscription notes, license activation sites, EDD Invoices details, PayPal Express payer IDs and EDD 2.x addresses and log IP addresses
+* New: `wp migrate-anonymize run` WP-CLI command to anonymize a database in place, without WP Migrate
+* New: `--rules` and `--prefix` options for `wp migrate-anonymize run`, and a `wpmdb_anonymization_config_files` filter, to anonymize with private rule files and tables under another prefix or none
+* New: Deterministic anonymization with a secret, keeping fake values consistent and unique across tables; fake email addresses, user names, domain names, URLs and hash-shaped values (md5, sha1, sha256, uuid) are also unique without a secret (#29)
 
 = 0.3.4 - 2019-05-21 =
 

@@ -65,6 +65,11 @@ class Plugin {
 	 * Bootstrap the functionality of the plugin on plugins_loaded so WPMDB already loaded.
 	 */
 	public function bootstrap() {
+		// The WP-CLI command works without WP Migrate, e.g. on a restored backup.
+		if ( defined( 'WP_CLI' ) && WP_CLI && class_exists( '\WP_CLI' ) ) {
+			\WP_CLI::add_command( 'migrate-anonymize', new CLI( $this->file_path ) );
+		}
+
 		if ( ! class_exists( 'WPMDB_PHP_Checker') && ! class_exists( 'WPMDB_Base' ) && ! class_exists( 'WPMDB_Command' ) ) {
 			return;
 		}
@@ -81,7 +86,7 @@ class Plugin {
 
 		$faker = Factory::create();
 
-		$migration = new Migration( $config, $faker );
+		$migration = new Migration( $config, $faker, new Anonymizer( $config, $faker ) );
 		$migration->register();
 	}
 
