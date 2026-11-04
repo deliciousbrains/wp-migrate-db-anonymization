@@ -20,7 +20,7 @@ When the plugin is activated it will anonymize by default. You will need to deac
 
 To preserve specific rows in the users table, use the `WPMDB_ANONYMIZATION_USER_LOGIN_WHITELIST` constant to set a whitelist of comma separated user logins.
 
-To replace all passwords with a hashed default password, set the password using the `WPMDB_ANONYMIZATION_DEFAULT_PASSWORD` constant.
+Passwords are replaced with a single hash per export or run, shared by every anonymized user: hashing is deliberately slow, so hashing a different password for each user would make large users tables crawl. Without a default password, nobody knows the shared password, so anonymized users can't log in. To give them all a password you know instead, set it using the `WPMDB_ANONYMIZATION_DEFAULT_PASSWORD` constant.
 
 These constants should be defined in the site's wp-config.php file, for example:
 

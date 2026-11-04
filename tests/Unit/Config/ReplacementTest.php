@@ -8,6 +8,16 @@ use WPMDB\Anonymization\Tests\TestCase;
 
 class ReplacementTest extends TestCase {
 
+	public function test_password_is_hashed_once_per_run() {
+		$first = Replacement::password( 'fake-password' );
+
+		$this->assertSame( 'hashed:fake-password', $first );
+		$this->assertSame( $first, Replacement::password( 'another-fake-password' ), 'Every user shares one hash.' );
+
+		Replacement::reset_password_cache();
+		$this->assertSame( 'hashed:third', Replacement::password( 'third' ) );
+	}
+
 	public function test_password_is_hashed() {
 		$this->assertFalse( defined( 'WPMDB_ANONYMIZATION_DEFAULT_PASSWORD' ), 'Default password constant must only be defined in isolated tests.' );
 
