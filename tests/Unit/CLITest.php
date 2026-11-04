@@ -396,7 +396,7 @@ class CLITest extends TestCase {
 		);
 
 		$this->assertContains( 'Stopped processing wp_users: database error while ' . $action . ': Simulated database error', $this->messages( 'warning' ) );
-		$this->assertSame( array( 'wp_users', 'wp_usermeta' ), $this->summary_tables(), 'Other tables are still processed.' );
+		$this->assertEqualsCanonicalizing( array( 'wp_users', 'wp_usermeta' ), $this->summary_tables(), 'Other tables are still processed (order follows the rule files).' );
 		$this->assertSame( 'alice@real.test', $this->wpdb->rows( 'wp_users' )['1']->user_email );
 		$this->assertNotSame( 'Alice', $this->wpdb->rows( 'wp_usermeta' )['1']->meta_value );
 	}
@@ -454,6 +454,66 @@ class CLITest extends TestCase {
 		$this->assertSame( 0, \WP_CLI::$items[0]['scanned'] );
 		$this->assertEquals( $before, $this->wpdb->rows( 'my_backup_table' ) );
 		$this->assertContains( 'Anonymized 0 row(s).', $this->messages( 'success' ) );
+	}
+
+	/**
+	 * The WHERE clause of the queries that read a table's rows.
+	 *
+	 * @param string $table
+	 *
+	 * @return string[]
+	 */
+	protected function select_queries( $table ) {
+		return array_values(
+			array_filter(
+				$this->wpdb->queries,
+				function ( $sql ) use ( $table ) {
+					return 0 === strpos( $sql, "SELECT * FROM \"{$table}\"" ) || 0 === strpos( $sql, "SELECT * FROM `{$table}`" );
+				}
+			)
+		);
+	}
+
+	public function test_usermeta_is_only_filtered_by_meta_value_on_sites_with_edd_data() {
+		$this->create_usermeta_table( 'wp_usermeta' );
+
+		$this->run_command( array( 'tables' => 'usermeta' ) );
+
+		$queries = $this->select_queries( 'wp_usermeta' );
+		$this->assertNotEmpty( $queries );
+		$this->assertStringContainsString( 'meta_key', $queries[0] );
+		$this->assertStringNotContainsString( 'meta_value', $queries[0], 'Without EDD data the usermeta rules only filter on meta_key.' );
+
+		// The EDD API key rule is constrained on meta_value.
+		$this->wpdb->exec( 'CREATE TABLE wp_edd_orders ( id INTEGER PRIMARY KEY, email TEXT )' );
+		$this->wpdb->queries = array();
+		\WP_CLI::reset();
+
+		$this->run_command( array( 'tables' => 'usermeta' ) );
+
+		$queries = $this->select_queries( 'wp_usermeta' );
+		$this->assertNotEmpty( $queries );
+		$this->assertStringContainsString( 'meta_value', $queries[0] );
+	}
+
+	public function test_edd_api_keys_cached_in_transients_are_replaced_in_place() {
+		$key       = str_repeat( implode( '', range( 0, 9 ) ) . 'abcdef', 2 );
+		$user_id   = 1;
+		// Named as EDD_API::get_user_secret_key() names the transient.
+		$cache_id  = md5( 'edd_api_user_secret_key' . $user_id );
+		$transient = '_transient_' . $cache_id;
+		$this->wpdb->exec( 'CREATE TABLE wp_edd_orders ( id INTEGER PRIMARY KEY, email TEXT )' );
+		$this->wpdb->exec( 'CREATE TABLE wp_options ( option_id INTEGER PRIMARY KEY, option_name TEXT, option_value TEXT, autoload TEXT )' );
+		$this->wpdb->exec( "INSERT INTO wp_options VALUES ( 1, 'siteurl', 'https://shop.test', 'yes' ), ( 2, '{$transient}', '{$key}', 'no' ), ( 3, '_transient_timeout_{$cache_id}', '1767225600', 'no' )" );
+
+		$this->run_command( array( 'tables' => 'options' ) );
+
+		$rows = $this->wpdb->rows( 'wp_options' );
+		$this->assertMatchesRegularExpression( '/^[a-f0-9]{32}$/', $rows['2']->option_value );
+		$this->assertNotSame( $key, $rows['2']->option_value );
+		$this->assertSame( $transient, $rows['2']->option_name );
+		$this->assertSame( 'https://shop.test', $rows['1']->option_value );
+		$this->assertSame( '1767225600', $rows['3']->option_value );
 	}
 
 	/**
@@ -683,7 +743,8 @@ class CLITest extends TestCase {
 			)
 		);
 
-		$this->assertSame( array( 'shop_users', 'shop_usermeta' ), $this->summary_tables() );
+		// Order follows the rule files (credentials.php also has usermeta rules), so compare contents.
+		$this->assertEqualsCanonicalizing( array( 'shop_users', 'shop_usermeta' ), $this->summary_tables() );
 
 		$users = $this->wpdb->rows( 'shop_users' );
 		$this->assertMatchesPattern( self::EMAIL_PATTERN, $users['1']->user_email );

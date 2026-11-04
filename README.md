@@ -47,7 +47,7 @@ You can also programmatically control which users are whitelisted with the follo
     
 ## Covered data
 
-The anonymization rules live in the `config` directory, one file per plugin. Order totals, dates, statuses, product data and IDs are never changed, so reports run on an anonymized copy still add up.
+The anonymization rules live in the `config` directory, one file per plugin. Order totals, dates, statuses, product data and IDs are never changed, so reports run on an anonymized copy still add up. The one status that is changed is a WooCommerce webhook's, which is disabled (see [Credentials](#credentials)).
 
 - `wordpress.php` (always loaded)
     - `users`: login, password, nicename, email, URL and display name
@@ -77,10 +77,30 @@ The anonymization rules live in the `config` directory, one file per plugin. Ord
     - `edd_subscriptions` (Recurring Payments): notes
     - `edd_license_activations` (Software Licensing): site URL
     - `usermeta` and `postmeta`: Stripe customer IDs, PayPal Express payer ID, EDD 2.x customer address, payment email and IP address, and file download and API request log IP addresses
+- `gravity-forms.php` (Gravity Forms 2.x, plus 1.x tables left after upgrading; loaded if a `gf_entry`, `gf_form` or `rg_lead` table exists)
+    - `gf_entry` and `rg_lead`: IP address, user agent and source URL
+    - `gf_entry_meta`, `rg_lead_detail` and `rg_lead_detail_long`: every field value, replaced with a sentence (see [Gravity Forms field values](#gravity-forms-field-values)). Entry meta that isn't a field value, such as add-on feed status, is kept
+    - `gf_entry_notes` and `rg_lead_notes`: note content and author name
+    - `gf_draft_submissions` and `rg_incomplete_submissions` (Save and Continue): email, IP address and source URL; the saved field values are replaced with an empty JSON object, and the resume token is replaced in exports, pushes and pulls (see [Gravity Forms drafts](#gravity-forms-drafts))
+    - `gf_form_view` and `rg_form_view`: IP address
+- `redirection.php` (Redirection; loaded if a `redirection_404` or `redirection_logs` table exists)
+    - `redirection_404` and `redirection_logs`: IP address, user agent, referrer and request data (logged HTTP headers), replaced with an empty JSON object. The requested URL and domain are kept so the logs stay useful, so personal data in a logged URL's query string is not removed
+- `credentials.php` (always loaded; see [Credentials](#credentials))
+    - `usermeta`: application passwords, Two Factor TOTP secrets, backup codes and email tokens, Metorik cart tokens
+    - `postmeta` and `wc_orders_meta`: WooCommerce Print Invoice & Delivery Note guest access and PDF tokens, Metorik cart tokens
+    - `woocommerce_api_keys`: consumer key and secret, truncated key and nonces
+    - `wc_webhooks`: secret and delivery URL; the status is set to `disabled`
+- `credentials-easy-digital-downloads.php` (loaded with `easy-digital-downloads.php`; see [Credentials](#credentials))
+    - `usermeta`: user API keys
+    - `options`: user API keys cached in transients
+    - `postmeta`: EDD 2.x API log keys and tokens, EDD Software Licensing 2.x license keys
+    - `posts`: query string of EDD 2.x API request logs (the excerpt of `edd_log` posts)
+    - `edd_logs_api_requests`: API key, token and request query string. In both API request logs, `public`, which EDD records as the key and token of a request made without an API key, is kept
+    - `edd_licenses`: license key
 
 Table names are given without the table prefix. On multisite, subsite tables such as `wp_2_postmeta` use the same rules as `wp_postmeta`.
 
-A plugin's rules are only loaded if its data is in the database, whether or not the plugin is active: WooCommerce if a `woocommerce_order_items`, `wc_orders` or `wc_customer_lookup` table exists for any site, or customer billing details remain in `usermeta`; Easy Digital Downloads if an `edd_customers` or `edd_orders` table exists. Sites without these plugins don't spend time checking their rules during a migration. The rules are loaded, and the `wpmdb_anonymization_config` filter applied, the first time they are needed during a migration rather than on every request.
+A plugin's rules are only loaded if its data is in the database, whether or not the plugin is active: WooCommerce if a `woocommerce_order_items`, `wc_orders` or `wc_customer_lookup` table exists for any site, or customer billing details remain in `usermeta`; Easy Digital Downloads (both `easy-digital-downloads.php` and `credentials-easy-digital-downloads.php`) if an `edd_customers` or `edd_orders` table exists. Sites without these plugins don't spend time checking their rules during a migration. The rules are loaded, and the `wpmdb_anonymization_config` filter applied, the first time they are needed during a migration rather than on every request.
 
 To force a plugin's rules on or off, use the `wpmdb_anonymization_load_config_file` filter:
 
@@ -98,6 +118,78 @@ To force a plugin's rules on or off, use the `wpmdb_anonymization_load_config_fi
         return $load;
     }
     add_filter( 'wpmdb_anonymization_load_config_file', 'my_wpmdb_anonymization_load_config_file', 10, 2 );
+
+### Credentials
+
+API keys, tokens and secrets aren't personal data, but they give access to the live site, its customers' orders and downloads, or the services it sends webhooks to, so `credentials.php` replaces them by default. Each is replaced with a random value of the same shape (for example 32 hexadecimal characters for an MD5-style key) so code that checks the format still works, but the replacements aren't working credentials: create new keys on the copy if you need them.
+
+WooCommerce webhooks are disabled, so the copy never sends order or customer data to the services the live site uses, and their delivery URLs, which often include a token, are replaced with subdomains of the reserved `example.com` domain. To test a webhook on the copy, point it at a test endpoint and set its status back to Active under WooCommerce > Settings > Advanced > Webhooks.
+
+Two Factor TOTP secrets and backup codes are replaced too, so users who set up two-factor authentication on the live site, including whitelisted users, need to set it up again on the copy, or deactivate the Two Factor plugin there.
+
+Easy Digital Downloads credentials are in a separate file, `credentials-easy-digital-downloads.php`, loaded only on sites with EDD data. EDD stores each user's API key as a `usermeta` meta key, so its rule is limited by `meta_value`, and loading it everywhere would make the WP-CLI command read every `usermeta` row on every site.
+
+EDD also caches each user's API keys for an hour in transients named with an MD5 hash that includes the user ID, so they can't be listed in a rule. Any transient with an MD5-style name and value is therefore given a random value of the same shape, which may include a cache another plugin stores the same way. With a [secret](#deterministic-anonymization), a cached key gets the same replacement as the key in `usermeta`. As the transient names can't be listed, the WP-CLI command reads every row of the `options` table on sites with EDD data. Sites with a persistent object cache keep transients there instead of in the database.
+
+To keep the original credentials, turn both files off:
+
+    add_filter( 'wpmdb_anonymization_load_config_file', function ( $load, $name ) {
+        return 0 === strpos( $name, 'credentials' ) ? false : $load;
+    }, 10, 2 );
+
+### Gravity Forms field values
+
+Gravity Forms stores each field value in `gf_entry_meta` under the field ID, such as `1`, or the field and input ID, such as `2.3` for the first name of a name field. Knowing which field is an email address, a phone number or a total would mean parsing every form, so every field value is replaced with a sentence. That includes product, quantity and total fields; the payment amount and status on the entry itself are kept.
+
+The rules for a column are tried in order and the first that matches the row is used, so to treat a form's fields differently, add rules to the start of the list. A constraint can check `form_id` as well as `meta_key`. Values are compared as strings:
+
+    add_filter( 'wpmdb_anonymization_config', function ( $config ) {
+        if ( ! isset( $config['gf_entry_meta'] ) ) {
+            return $config;
+        }
+
+        array_unshift(
+            $config['gf_entry_meta']['meta_value'],
+            // Field 2 of form 3 is an email address.
+            array(
+                'constraint'     => array( 'form_id' => '3', 'meta_key' => '2' ),
+                'fake_data_type' => 'email',
+            ),
+            // Field 5 of form 3 is a phone number.
+            array(
+                'constraint'     => array( 'form_id' => '3', 'meta_key' => '5' ),
+                'fake_data_type' => 'phoneNumber',
+            )
+        );
+
+        return $config;
+    } );
+
+To keep a field's values as they are, skip the rule for those rows with the `wpmdb_anonymization_pre_rule_valid` filter:
+
+    add_filter( 'wpmdb_anonymization_pre_rule_valid', function ( $valid, $rule, $row ) {
+        // Keep field 7 (a product drop-down) of form 3.
+        if ( isset( $row->entry_id, $row->form_id, $row->meta_key ) && '3' === (string) $row->form_id && '7' === $row->meta_key ) {
+            return false;
+        }
+
+        return $valid;
+    }, 10, 3 );
+
+Field IDs are matched with a regular expression, so the WP-CLI command reads every row of `gf_entry_meta` whether or not you add rules like these.
+
+### Gravity Forms drafts
+
+Save and Continue drafts are stored in `gf_draft_submissions`, or `rg_incomplete_submissions` before Gravity Forms 2.3. Each draft's `uuid` is also its resume token: the `gf_token` in the link sent to the user, which opens the saved entry. Drafts are short-lived resume links; Gravity Forms deletes them after 30 days by default (`gform_incomplete_submissions_expiration_days`).
+
+Exports, pushes and pulls replace the token with a random 32-character hex value, the same format Gravity Forms uses, so tokens in the copy can't open or resume drafts on the live site.
+
+The WP-CLI command can't replace the token, because `uuid` is the table's primary key (see [WP-CLI](#wp-cli)). When anonymizing in place, empty both tables, using your table prefix in place of `wp_`:
+
+    wp db query "TRUNCATE TABLE wp_gf_draft_submissions"
+    wp db query "TRUNCATE TABLE wp_rg_incomplete_submissions"
+
+The second table can only exist on sites that ran Gravity Forms 2.2 or earlier; skip it if it doesn't.
 
 ### Column constraints
 
@@ -172,7 +264,7 @@ Example output:
 How it works:
 
 - Rows are read in batches ordered by primary key and changed values are written back row by row, one transaction per batch. Tables without a single-column primary key are skipped with a warning.
-- Rules on a table's primary-key column are skipped with a warning: rows are read in key order, so changing the keys would skip or repeat rows. If the keys themselves are personal data, empty such tables instead.
+- Rules on a table's primary-key column are skipped with a warning: rows are read in key order, so changing the keys would skip or repeat rows. If the keys themselves are personal data, empty such tables instead. Gravity Forms draft resume tokens are one example: see [Gravity Forms drafts](#gravity-forms-drafts).
 - When every rule for a table is limited to specific values of a column, as with the `meta_key` rules for `usermeta` and `postmeta`, only those rows are read (`WHERE meta_key IN (...)`) instead of the whole table.
 - A simple regex constraint, such as a meta key suffix, is read with `LIKE` patterns instead. A regex ending in `$` also matches a value ending in a newline, as it does in PHP, so those rows are read too. A constraint on several columns is pushed down by one of them, the first with exact values or a list, otherwise the first simple regex; the other columns are still checked on each row.
 - The user whitelist constant and filter are respected, and empty values are left empty.
@@ -291,7 +383,7 @@ or to a single WP-CLI run with `--rules=/path/private-rules.php` (see [WP-CLI](#
 
 - Table names are written without the table prefix, as in the bundled files. With the WP-CLI `--prefix=''` option they are used exactly as written, so a rule for `my_backup_table` processes the table `my_backup_table`.
 - Extra files are merged with the bundled rules. If both define the same table and column, both sets of rules are kept, bundled rules first, and each value uses the first rule whose constraint matches. Rules with different constraints, such as different `meta_key` values, therefore all apply. To replace a bundled rule for the same rows, change it with the `wpmdb_anonymization_config` filter instead.
-- Extra files have no requirements, so they are always loaded. The `wpmdb_anonymization_load_config_file` filter receives their file name without `.php` (e.g. `private-rules`) and can turn them off. Don't name a file after a bundled one (`wordpress.php`, `woocommerce.php`, `easy-digital-downloads.php`), or that file's requirements apply to it.
+- Extra files have no requirements, so they are always loaded. The `wpmdb_anonymization_load_config_file` filter receives their file name without `.php` (e.g. `private-rules`) and can turn them off. Don't name a file after a bundled one (such as `wordpress.php`, `woocommerce.php` or `easy-digital-downloads.php`), or that file's requirements apply to it.
 - The file should only return an array, without declaring functions or classes: the WP-CLI command includes it once to check it before the rules are loaded. Paths that aren't files are skipped by the filter; `--rules` reports them as an error.
 
 ## Development
